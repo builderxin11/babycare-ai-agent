@@ -10,11 +10,15 @@ import time
 import uuid
 from pathlib import Path
 
+from langgraph.types import Command
+
 from agent.graph.builder import compile_graph
 from agent.models.outputs import ParentingAdvice
 from agent.models.state import AgentState
 
 from .models import TestCase
+
+MAX_HITL_RESUMES = 2  # safety cap — prevent infinite interrupt loops
 
 GOLD_DATASET_PATH = Path(__file__).resolve().parent.parent.parent / "eval" / "gold_dataset.json"
 
@@ -53,23 +57,21 @@ def run_single_case(
 
     start = time.monotonic()
 
-    try:
-        for event in app.stream(initial_state, config, stream_mode="updates"):
-            pass  # consume all events
-    except Exception as e:
-        # Handle HITL interrupt — auto-approve and resume
-        if "interrupt" in type(e).__name__.lower() or "GraphInterrupt" in str(type(e)):
-            try:
-                for event in app.stream(
-                    {"human_feedback": "[EVAL] Auto-approved"},
-                    config,
-                    stream_mode="updates",
-                ):
-                    pass
-            except Exception:
-                pass  # second interrupt is unexpected but don't crash eval
-        else:
-            raise
+    # Run the graph, consuming all streamed events
+    for event in app.stream(initial_state, config, stream_mode="updates"):
+        pass
+
+    # Handle HITL interrupts — auto-approve so the graph completes.
+    # In LangGraph >=1.0, interrupt() does NOT raise an exception;
+    # the stream ends normally and state.next shows the paused node.
+    for _ in range(MAX_HITL_RESUMES):
+        state = app.get_state(config)
+        if not state.next:
+            break  # graph finished — no pending interrupt
+        for event in app.stream(
+            Command(resume="[EVAL] Auto-approved"), config, stream_mode="updates"
+        ):
+            pass
 
     elapsed = time.monotonic() - start
 
