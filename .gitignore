@@ -11,3 +11,6 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Knowledge Base reference docs (uploaded to S3, not app code)
+kb-docs/

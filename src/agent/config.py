@@ -13,8 +13,8 @@ class AgentConfig:
     aws_region: str = "us-west-2"
 
     # Model IDs (Bedrock)
-    sonnet_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
-    opus_model_id: str = "anthropic.claude-4-6-opus"
+    sonnet_model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+    opus_model_id: str = "us.anthropic.claude-opus-4-6-v1"
 
     # Bedrock Knowledge Base
     bedrock_kb_id: str = ""  # env: BEDROCK_KB_ID
@@ -37,11 +37,11 @@ class AgentConfig:
             aws_region=os.getenv("AWS_REGION", "us-west-2"),
             sonnet_model_id=os.getenv(
                 "SONNET_MODEL_ID",
-                "anthropic.claude-3-5-sonnet-20241022-v2:0",
+                "us.anthropic.claude-sonnet-4-20250514-v1:0",
             ),
             opus_model_id=os.getenv(
                 "OPUS_MODEL_ID",
-                "anthropic.claude-4-6-opus",
+                "us.anthropic.claude-opus-4-6-v1",
             ),
             bedrock_kb_id=os.getenv("BEDROCK_KB_ID", ""),
             xhs_mcp_url=os.getenv("XHS_MCP_URL", ""),

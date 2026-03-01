@@ -19,7 +19,7 @@ Build a production-grade **Multi-Agent System (MAS)** for parenting. The goal is
 
 ## 4. Technical Stack & Commands
 - **Backend:** AWS Amplify Gen 2, LangGraph, PydanticAI.
-- **Model:** Amazon Bedrock `anthropic.claude-3-5-sonnet-20241022-v2:0` (for sub-agents) and `anthropic.claude-4-6-opus` (for Moderator/Judge).
+- **Model:** Amazon Bedrock `us.anthropic.claude-sonnet-4-20250514-v1:0` (for sub-agents) and `us.anthropic.claude-opus-4-6-v1` (for Moderator/Judge).
 - **Persistence:** DynamoDB-backed `LangGraph Checkpointer` for async HITL.
 - **Commands:**
     - Sync Sandbox: `npx ampx sandbox`
