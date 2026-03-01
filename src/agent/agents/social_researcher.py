@@ -18,7 +18,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from agent.config import config
-from agent.models.outputs import Citation, SocialInsight
+from agent.models.outputs import Citation, SocialInsight, SourceStatus, SourceStatusCode
 from agent.models.state import AgentState
 from agent.prompts.templates import SOCIAL_RESEARCHER_HUMAN, SOCIAL_RESEARCHER_SYSTEM
 
@@ -83,16 +83,18 @@ def _mcp_call(method: str, params: dict[str, Any]) -> Any:
     return body.get("result", [])
 
 
-def _fetch_xhs_notes(query: str, max_notes: int = 3) -> list[dict[str, Any]]:
+def _fetch_xhs_notes(query: str, max_notes: int = 3) -> tuple[list[dict[str, Any]], int]:
     """Search XHS notes and fetch details for the top ones by engagement.
 
     Per-note get_note_detail errors are caught individually so one bad note
     doesn't break the entire search.
+
+    Returns (notes, failed_detail_count).
     """
     raw_notes = _mcp_call("search_notes", {"keyword": query})
 
     if not raw_notes:
-        return []
+        return [], 0
 
     # Sort by total engagement (likes + comments + collects)
     def _engagement(note: dict) -> int:
@@ -105,6 +107,7 @@ def _fetch_xhs_notes(query: str, max_notes: int = 3) -> list[dict[str, Any]]:
     sorted_notes = sorted(raw_notes, key=_engagement, reverse=True)[:max_notes]
 
     detailed: list[dict[str, Any]] = []
+    failed_count = 0
     for note in sorted_notes:
         note_id = note.get("id") or note.get("note_id")
         if not note_id:
@@ -119,8 +122,9 @@ def _fetch_xhs_notes(query: str, max_notes: int = 3) -> list[dict[str, Any]]:
         except Exception:
             logger.warning("Failed to fetch detail for note %s, using summary.", note_id)
             detailed.append(note)
+            failed_count += 1
 
-    return detailed
+    return detailed, failed_count
 
 
 def _format_notes_as_context(notes: list[dict[str, Any]]) -> str:
@@ -298,25 +302,36 @@ def _run_skip() -> SocialInsight:
     )
 
 
-def _run_mcp(state: AgentState) -> SocialInsight:
+def _run_mcp(state: AgentState) -> tuple[SocialInsight, SourceStatus]:
     """Full MCP: search XHS notes, then LLM synthesize.
 
     If MCP retrieval fails or returns no results, falls back to _run_skip().
     If the LLM call itself fails, the exception propagates.
+
+    Returns (insight, source_status).
     """
     notes: list[dict] = []
+    failed_detail_count = 0
     try:
         query = _build_search_query(state)
-        notes = _fetch_xhs_notes(query)
+        notes, failed_detail_count = _fetch_xhs_notes(query)
     except Exception:
         logger.warning(
             "XHS MCP retrieval failed; skipping social cross-check.", exc_info=True
         )
-        return _run_skip()
+        return _run_skip(), SourceStatus(
+            source="Social Cross-Check (Xiaohongshu)",
+            status=SourceStatusCode.SKIPPED,
+            message="Xiaohongshu MCP server was unreachable. Social cross-check was not performed.",
+        )
 
     if not notes:
         logger.info("XHS MCP returned no results; skipping social cross-check.")
-        return _run_skip()
+        return _run_skip(), SourceStatus(
+            source="Social Cross-Check (Xiaohongshu)",
+            status=SourceStatusCode.SKIPPED,
+            message="Xiaohongshu MCP search returned no results. Social cross-check was not performed.",
+        )
 
     xhs_citations = _extract_citations_from_notes(notes)
     context_block = _format_notes_as_context(notes)
@@ -334,7 +349,23 @@ def _run_mcp(state: AgentState) -> SocialInsight:
     # Override sample_size with real engagement total
     insight.sample_size = sample_size
 
-    return insight
+    if failed_detail_count > 0:
+        status = SourceStatus(
+            source="Social Cross-Check (Xiaohongshu)",
+            status=SourceStatusCode.DEGRADED,
+            message=(
+                f"Retrieved social data but {failed_detail_count} note detail(s) "
+                f"failed to load. Results are based on partial data."
+            ),
+        )
+    else:
+        status = SourceStatus(
+            source="Social Cross-Check (Xiaohongshu)",
+            status=SourceStatusCode.OK,
+            message=f"Analyzed {len(notes)} top Xiaohongshu posts ({sample_size} total engagements).",
+        )
+
+    return insight, status
 
 
 # ---------------------------------------------------------------------------
@@ -351,14 +382,27 @@ def social_researcher_node(state: AgentState) -> dict:
     """
     if config.use_mock_data:
         insight = _run_stub(state)
+        source_status = SourceStatus(
+            source="Social Cross-Check (Xiaohongshu)",
+            status=SourceStatusCode.OK,
+            message="Social consensus based on community data.",
+        )
     elif config.xhs_mcp_url:
-        insight = _run_mcp(state)
+        insight, source_status = _run_mcp(state)
     else:
         insight = _run_skip()
+        source_status = SourceStatus(
+            source="Social Cross-Check (Xiaohongshu)",
+            status=SourceStatusCode.SKIPPED,
+            message=(
+                "No Xiaohongshu MCP server configured. Social cross-check was not performed."
+            ),
+        )
 
     return {
         "social_insight": insight,
         "agents_completed": ["social_researcher"],
+        "source_statuses": [source_status],
         "messages": [AIMessage(
             content=f"[social_researcher] {insight.summary}",
             name="social_researcher",

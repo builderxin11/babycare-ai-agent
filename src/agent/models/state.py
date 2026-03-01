@@ -13,6 +13,7 @@ from langgraph.graph import add_messages
 from .outputs import (
     CritiqueResult,
     ParentingAdvice,
+    SourceStatus,
     TrendAnalysis,
     MedicalInsight,
     SocialInsight,
@@ -42,6 +43,9 @@ class AgentState(TypedDict, total=False):
     trend_analysis: TrendAnalysis | None
     medical_insight: MedicalInsight | None
     social_insight: SocialInsight | None
+
+    # --- Source transparency ---
+    source_statuses: Annotated[list[SourceStatus], operator.add]
 
     # --- Critique / reflection ---
     critique_result: CritiqueResult | None

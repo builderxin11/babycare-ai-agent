@@ -2,12 +2,14 @@
 
 Provides four node functions for the graph:
 1. supervisor_node: Sequential dispatch to specialist agents
-2. critique_node: Rule-based reflection loop
+2. critique_node: Two-tier reflection loop (LLM or rule-based)
 3. hitl_node: Human-in-the-loop interrupt gate
 4. synthesize_node: Final advice assembly
 """
 
 from __future__ import annotations
+
+import logging
 
 from langchain_core.messages import AIMessage
 from langgraph.types import interrupt
@@ -19,8 +21,13 @@ from agent.models.outputs import (
     CritiqueResult,
     ParentingAdvice,
     RiskLevel,
+    SourceStatus,
+    SourceStatusCode,
 )
 from agent.models.state import AgentState
+from agent.prompts.templates import CRITIQUE_HUMAN, CRITIQUE_SYSTEM
+
+logger = logging.getLogger(__name__)
 
 # The order in which specialist agents are dispatched
 AGENT_SEQUENCE = [
@@ -54,18 +61,48 @@ def supervisor_node(state: AgentState) -> dict:
     }
 
 
-def critique_node(state: AgentState) -> dict:
-    """Rule-based critique of accumulated agent outputs.
+def _format_agent_output(obj: object) -> str:
+    """Serialize a Pydantic model (or None) to readable text for the prompt."""
+    if obj is None:
+        return "(no output produced)"
+    if hasattr(obj, "model_dump_json"):
+        return obj.model_dump_json(indent=2)  # type: ignore[union-attr]
+    return str(obj)
 
-    Checks:
-    - All three agents have produced output
-    - Citations exist on each output
-    - Risk level assessment
-    - Computes confidence score
 
-    TODO: Replace with Claude Opus LLM-based critique.
-    """
-    iteration = (state.get("critique_count") or 0) + 1
+def _format_critique_prompt(state: AgentState) -> str:
+    """Fill CRITIQUE_HUMAN placeholders with agent outputs from the state."""
+    return CRITIQUE_HUMAN.format(
+        question=state.get("question", "(unknown)"),
+        baby_age_months=state.get("baby_age_months", "unknown"),
+        trend_analysis=_format_agent_output(state.get("trend_analysis")),
+        medical_insight=_format_agent_output(state.get("medical_insight")),
+        social_insight=_format_agent_output(state.get("social_insight")),
+    )
+
+
+def _call_critique_llm(state: AgentState) -> CritiqueResult:
+    """Invoke Claude Opus via Bedrock to produce a structured CritiqueResult."""
+    from langchain_aws import ChatBedrockConverse  # lazy import — mock mode never hits AWS
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    llm = ChatBedrockConverse(
+        model=config.opus_model_id,
+        region_name=config.aws_region,
+        temperature=0,
+    )
+    structured_llm = llm.with_structured_output(CritiqueResult)
+
+    human_text = _format_critique_prompt(state)
+    messages = [
+        SystemMessage(content=CRITIQUE_SYSTEM),
+        HumanMessage(content=human_text),
+    ]
+    return structured_llm.invoke(messages)  # type: ignore[return-value]
+
+
+def _run_rule_based(state: AgentState, iteration: int) -> dict:
+    """Deterministic rule-based critique (original logic)."""
     issues: list[str] = []
     suggestions: list[str] = []
 
@@ -130,19 +167,92 @@ def critique_node(state: AgentState) -> dict:
         suggestions=suggestions,
     )
 
-    status = "APPROVED" if approved else "REJECTED"
+    status_text = "APPROVED" if approved else "REJECTED"
+
+    if iteration >= config.max_critique_iterations and issues:
+        source_status = SourceStatus(
+            source="Quality Review",
+            status=SourceStatusCode.DEGRADED,
+            message=(
+                f"Advice force-approved after max iterations ({iteration}) "
+                f"despite {len(issues)} unresolved issue(s)."
+            ),
+        )
+    else:
+        source_status = SourceStatus(
+            source="Quality Review",
+            status=SourceStatusCode.OK,
+            message=f"Advice reviewed using rule-based quality checks (iteration {iteration}).",
+        )
 
     return {
         "critique_result": result,
         "critique_count": iteration,
+        "source_statuses": [source_status],
         "messages": [AIMessage(
             content=(
-                f"[critique] Iteration {iteration}: {status} "
+                f"[critique] Iteration {iteration}: {status_text} "
                 f"(confidence={result.confidence_score})"
             ),
             name="critique",
         )],
     }
+
+
+def _run_llm(state: AgentState, iteration: int) -> dict:
+    """LLM-based critique via Claude Opus, with rule-based fallback."""
+    # Max iterations — force approve regardless of LLM opinion
+    if iteration >= config.max_critique_iterations:
+        logger.info("Critique max iterations reached (%d), force-approving", iteration)
+        return _run_rule_based(state, iteration)
+
+    try:
+        result = _call_critique_llm(state)
+    except Exception:
+        logger.warning("LLM critique failed, falling back to rule-based", exc_info=True)
+        fallback_result = _run_rule_based(state, iteration)
+        # Override the source status to reflect LLM failure
+        fallback_result["source_statuses"] = [SourceStatus(
+            source="Quality Review",
+            status=SourceStatusCode.FALLBACK,
+            message=(
+                "AI quality judge was unavailable. "
+                "Advice reviewed using rule-based quality checks instead."
+            ),
+        )]
+        return fallback_result
+
+    status_text = "APPROVED" if result.approved else "REJECTED"
+
+    return {
+        "critique_result": result,
+        "critique_count": iteration,
+        "source_statuses": [SourceStatus(
+            source="Quality Review",
+            status=SourceStatusCode.OK,
+            message="Advice reviewed and approved by AI quality judge.",
+        )],
+        "messages": [AIMessage(
+            content=(
+                f"[critique/llm] Iteration {iteration}: {status_text} "
+                f"(confidence={result.confidence_score})"
+            ),
+            name="critique",
+        )],
+    }
+
+
+def critique_node(state: AgentState) -> dict:
+    """Two-tier critique of accumulated agent outputs.
+
+    When use_mock_data=True (default): deterministic rule-based checks.
+    When use_mock_data=False: Claude Opus LLM judge with rule-based fallback.
+    """
+    iteration = (state.get("critique_count") or 0) + 1
+
+    if config.use_mock_data:
+        return _run_rule_based(state, iteration)
+    return _run_llm(state, iteration)
 
 
 def hitl_node(state: AgentState) -> dict:
@@ -254,6 +364,7 @@ def synthesize_node(state: AgentState) -> dict:
         risk_level=risk,
         confidence_score=confidence,
         citations=all_citations,
+        sources_used=state.get("source_statuses", []),
     )
 
     return {

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from langchain_core.messages import AIMessage
 
 from agent.config import config
-from agent.models.outputs import Citation, MedicalInsight, RiskLevel
+from agent.models.outputs import Citation, MedicalInsight, RiskLevel, SourceStatus, SourceStatusCode
 from agent.models.state import AgentState
 from agent.prompts.templates import MEDICAL_EXPERT_HUMAN, MEDICAL_EXPERT_SYSTEM
 
@@ -25,6 +25,10 @@ if TYPE_CHECKING:
     from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
+
+
+class _KBRetrievalFailed(Exception):
+    """Internal: raised when KB retrieval fails so the node can produce a FALLBACK status."""
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +277,7 @@ def _run_rag(state: AgentState) -> MedicalInsight:
         logger.warning(
             "KB retrieval failed; falling back to LLM-only.", exc_info=True
         )
-        return _run_llm_only(state)
+        raise _KBRetrievalFailed()
 
     kb_citations = _extract_citations_from_docs(docs)
     context_block = _format_docs_as_context(docs)
@@ -304,14 +308,46 @@ def medical_expert_node(state: AgentState) -> dict:
     """
     if config.use_mock_data:
         insight = _run_stub(state)
+        source_status = SourceStatus(
+            source="Medical Knowledge Base",
+            status=SourceStatusCode.OK,
+            message="Medical assessment based on built-in clinical guidelines.",
+        )
     elif config.bedrock_kb_id:
-        insight = _run_rag(state)
+        try:
+            insight = _run_rag(state)
+            source_status = SourceStatus(
+                source="Medical Knowledge Base",
+                status=SourceStatusCode.OK,
+                message="Retrieved and analyzed authoritative medical references.",
+            )
+        except _KBRetrievalFailed:
+            insight = _run_llm_only(state)
+            source_status = SourceStatus(
+                source="Medical Knowledge Base",
+                status=SourceStatusCode.FALLBACK,
+                message=(
+                    "Medical knowledge base retrieval failed. Assessment is based on "
+                    "the model's general medical training knowledge rather than "
+                    "retrieved authoritative documents."
+                ),
+            )
     else:
         insight = _run_llm_only(state)
+        source_status = SourceStatus(
+            source="Medical Knowledge Base",
+            status=SourceStatusCode.FALLBACK,
+            message=(
+                "No medical knowledge base configured. Assessment is based on "
+                "the model's general medical training knowledge rather than "
+                "retrieved authoritative documents."
+            ),
+        )
 
     return {
         "medical_insight": insight,
         "agents_completed": ["medical_expert"],
+        "source_statuses": [source_status],
         "messages": [AIMessage(
             content=f"[medical_expert] {insight.summary}",
             name="medical_expert",

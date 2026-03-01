@@ -16,6 +16,21 @@ class RiskLevel(StrEnum):
     HIGH = "HIGH"
 
 
+class SourceStatusCode(StrEnum):
+    OK = "ok"             # Source worked as intended
+    DEGRADED = "degraded" # Partial success (e.g., some note details failed)
+    FALLBACK = "fallback" # Source failed, alternative used
+    SKIPPED = "skipped"   # Source not available/configured
+
+
+class SourceStatus(BaseModel):
+    """Status of a single data source used during advice generation."""
+
+    source: str = Field(description="e.g. 'Medical Knowledge Base'")
+    status: SourceStatusCode
+    message: str = Field(description="User-facing explanation of what happened")
+
+
 class Citation(BaseModel):
     """A single source citation attached to advice."""
 
@@ -84,6 +99,7 @@ class ParentingAdvice(BaseModel):
     risk_level: RiskLevel = RiskLevel.LOW
     confidence_score: float = Field(ge=0.0, le=1.0)
     citations: list[Citation] = Field(default_factory=list)
+    sources_used: list[SourceStatus] = Field(default_factory=list)
     disclaimer: str = (
         "This is AI-generated guidance and not a substitute for professional medical advice. "
         "Always consult your pediatrician for health concerns."

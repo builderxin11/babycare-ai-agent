@@ -9,6 +9,8 @@ import uuid
 
 from langgraph.types import interrupt
 
+from agent.models.outputs import SourceStatusCode
+
 
 DEMO_QUESTION = (
     "My 4-month-old daughter Mia got her DTaP vaccine 2 days ago and has been "
@@ -79,6 +81,18 @@ def run_demo() -> None:
         print("=" * 60)
         print("FINAL PARENTING ADVICE")
         print("=" * 60)
+        if advice.sources_used:
+            _STATUS_LABELS = {
+                SourceStatusCode.OK: "OK",
+                SourceStatusCode.DEGRADED: "DG",
+                SourceStatusCode.FALLBACK: "FB",
+                SourceStatusCode.SKIPPED: "--",
+            }
+            print("  Data Sources:")
+            for src in advice.sources_used:
+                label = _STATUS_LABELS.get(src.status, "??")
+                print(f"    [{label}] {src.source}: {src.message}")
+            print()
         print(f"  Confidence: {advice.confidence_score}")
         print(f"  Risk Level: {advice.risk_level}")
         print()

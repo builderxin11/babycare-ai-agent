@@ -15,7 +15,7 @@ from langchain_core.messages import AIMessage
 
 from agent.models.domain import ContextEvent, PhysiologyLog
 from agent.models.enums import PhysiologyLogType
-from agent.models.outputs import Citation, TrendAnalysis, TrendAnomaly
+from agent.models.outputs import Citation, SourceStatus, SourceStatusCode, TrendAnalysis, TrendAnomaly
 from agent.models.state import AgentState
 from agent.tools.mock_data import MOCK_CONTEXT_EVENTS, generate_mock_physiology_logs
 
@@ -174,6 +174,11 @@ def data_scientist_node(state: AgentState) -> dict:
     return {
         "trend_analysis": trend,
         "agents_completed": ["data_scientist"],
+        "source_statuses": [SourceStatus(
+            source="Baby Data Analysis",
+            status=SourceStatusCode.OK,
+            message=f"Analyzed {num_days} days of physiology data ({len(logs)} records).",
+        )],
         "messages": [AIMessage(
             content=f"[data_scientist] {summary}",
             name="data_scientist",
