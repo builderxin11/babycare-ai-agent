@@ -36,7 +36,25 @@ Build a production-grade **Multi-Agent System (MAS)** for parenting. The goal is
 ## 6. Architecture Overview
 
 
-## 7. Instructions for Claude Code
+## 7. Future Features (Planned)
+
+### Daily Health Report (P1)
+Automated daily analysis that runs at end-of-day on the baby's logged data and generates a proactive report for parents. This is a **push** model (system initiates) vs the current **pull** model (parent asks a question).
+
+**Requirements:**
+- Trigger: Scheduled (e.g., 9 PM daily) or when enough new PhysiologyLog entries accumulate.
+- Input: That day's PhysiologyLog + ContextEvent data for the baby, plus rolling 7-day baseline.
+- Output: A structured `DailyReport` containing:
+  - Overall health status (healthy / monitor / concern)
+  - Key observations (e.g., "Feeding volume recovered to baseline after 2 days of post-vaccine dip")
+  - Trend comparisons vs. the past 7 days (improving / stable / declining)
+  - Actionable tips tailored to the day's data (e.g., "Consider offering an extra feed before bedtime")
+  - Flags for anything that warrants pediatrician attention
+- Must reuse the existing multi-agent pipeline: Data Scientist for trends → Medical Expert for interpretation → Critique for safety review.
+- Must work even without a parent question — the agents need to self-generate the "question" from the data.
+- Store reports in a new `DailyReport` DynamoDB table linked to Baby, so parents can review history.
+
+## 8. Instructions for Claude Code
 - **Always** create a Spec in `.q/specs/` before implementing new Agent logic.
 - **Never** simplify the Multi-Agent logic for the sake of speed.
 - **Focus** on the "Reconciliation" logic: how to resolve conflicts when the Medical Agent and Social Agent disagree.
