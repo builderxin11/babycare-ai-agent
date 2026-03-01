@@ -79,7 +79,10 @@ def run_demo() -> None:
     print()
     if advice:
         print("=" * 60)
-        print("FINAL PARENTING ADVICE")
+        if advice.is_degraded:
+            print("PARENTING ADVICE (DEGRADED — Raw Sources)")
+        else:
+            print("FINAL PARENTING ADVICE")
         print("=" * 60)
         if advice.sources_used:
             _STATUS_LABELS = {
@@ -103,15 +106,21 @@ def run_demo() -> None:
         for i, point in enumerate(advice.key_points, 1):
             print(f"    {i}. {point}")
         print()
+        if advice.is_degraded and advice.raw_sources:
+            print("  Raw Sources:")
+            for i, raw in enumerate(advice.raw_sources, 1):
+                print(f"    {i}. {raw}")
+            print()
         print("  Action Items:")
         for i, item in enumerate(advice.action_items, 1):
             print(f"    {i}. {item}")
         print()
-        citations_str = ", ".join(
-            f"[{c.source_type}: {c.reference}]" for c in advice.citations
-        )
-        print(f"  Citations: {citations_str}")
-        print()
+        if advice.citations:
+            citations_str = ", ".join(
+                f"[{c.source_type}: {c.reference}]" for c in advice.citations
+            )
+            print(f"  Citations: {citations_str}")
+            print()
         print(f"  Disclaimer: {advice.disclaimer}")
     else:
         print("ERROR: No final advice produced.")

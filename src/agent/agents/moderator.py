@@ -19,8 +19,10 @@ from agent.models.enums import AgentRole
 from agent.models.outputs import (
     Citation,
     CritiqueResult,
+    MedicalInsight,
     ParentingAdvice,
     RiskLevel,
+    SocialInsight,
     SourceStatus,
     SourceStatusCode,
 )
@@ -35,6 +37,67 @@ AGENT_SEQUENCE = [
     AgentRole.MEDICAL_EXPERT,
     AgentRole.SOCIAL_RESEARCHER,
 ]
+
+
+def _compute_three_source_confidence(
+    medical: MedicalInsight | None,
+    social: SocialInsight | None,
+    *,
+    no_issues: bool,
+    total_citations: int,
+    has_correlations: bool,
+) -> float:
+    """Compute confidence using the three-source model (KB, LLM, Social).
+
+    Base: 0.50
+    KB + LLM interaction:
+      KB found (kb_available=True)  + LLM present  -> +0.20
+      KB missing (kb_available=False) + LLM present -> -0.05  (small; KB is small corpus)
+      KB stub (kb_available=None)                   -> +0.20  (simulated success)
+    LLM + Social interaction:
+      agrees_with_medical=True   -> +0.10
+      agrees_with_medical=False  -> -0.15  (contradiction)
+      agrees_with_medical=None   -> +0.00  (unknown)
+    Three-way bonus:
+      KB found/stub + LLM + Social agree -> +0.10  (stacks)
+    Legacy bonuses:
+      No issues       -> +0.05
+      3+ citations    -> +0.03
+      Has correlations -> +0.02
+    Capped at [0.10, 0.95]
+    """
+    score = 0.50
+
+    # KB + LLM interaction
+    kb_available = medical.kb_available if medical else False
+    if kb_available is True:
+        score += 0.20
+    elif kb_available is None:
+        score += 0.20  # stub — simulated success
+    else:
+        score -= 0.05  # kb_available=False — KB miss
+
+    # LLM + Social interaction
+    agrees = social.agrees_with_medical if social else None
+    if agrees is True:
+        score += 0.10
+    elif agrees is False:
+        score -= 0.15
+    # None -> no adjustment
+
+    # Three-way bonus: KB available (True or None) + social agrees
+    if kb_available is not False and agrees is True:
+        score += 0.10
+
+    # Legacy bonuses
+    if no_issues:
+        score += 0.05
+    if total_citations >= 3:
+        score += 0.03
+    if has_correlations:
+        score += 0.02
+
+    return round(max(0.10, min(score, 0.95)), 2)
 
 
 def supervisor_node(state: AgentState) -> dict:
@@ -144,16 +207,21 @@ def _run_rule_based(state: AgentState, iteration: int) -> dict:
     if risk == RiskLevel.HIGH:
         suggestions.append("High-risk topic detected — ensure conservative recommendations")
 
-    # Compute confidence
-    base_confidence = 0.7
-    if not issues:
-        base_confidence += 0.1
-    if total_citations >= 3:
-        base_confidence += 0.05
-    if trend and trend.correlations:
-        base_confidence += 0.05
-    # Cap at 0.95
-    confidence = min(base_confidence, 0.95)
+    # Detect contradiction between medical and social
+    if social and social.agrees_with_medical is False:
+        issues.append(
+            "Social consensus contradicts medical guidance — "
+            "advice must acknowledge this conflict"
+        )
+
+    # Compute confidence using three-source model
+    confidence = _compute_three_source_confidence(
+        medical,
+        social,
+        no_issues=len(issues) == 0,
+        total_citations=total_citations,
+        has_correlations=bool(trend and trend.correlations),
+    )
 
     # Max iterations check
     approved = len(issues) == 0 or iteration >= config.max_critique_iterations
@@ -303,8 +371,8 @@ def hitl_node(state: AgentState) -> dict:
     }
 
 
-def synthesize_node(state: AgentState) -> dict:
-    """Assemble final ParentingAdvice from all agent outputs."""
+def _synthesize_normal(state: AgentState) -> ParentingAdvice:
+    """Standard synthesis: combine all agent outputs into coherent advice."""
     trend = state.get("trend_analysis")
     medical = state.get("medical_insight")
     social = state.get("social_insight")
@@ -327,6 +395,13 @@ def synthesize_node(state: AgentState) -> dict:
         key_points.append(medical.summary)
     if social:
         key_points.append(social.summary)
+
+    # Add contradiction note when social disagrees with medical
+    if social and social.agrees_with_medical is False:
+        key_points.append(
+            "NOTE: Social community experience differs from the medical assessment. "
+            "Medical guidance takes precedence — please consult your pediatrician."
+        )
 
     # Collect action items from medical recommendations
     action_items: list[str] = []
@@ -356,7 +431,7 @@ def synthesize_node(state: AgentState) -> dict:
 
     summary = " ".join(summary_parts) if summary_parts else "Analysis complete."
 
-    advice = ParentingAdvice(
+    return ParentingAdvice(
         question=question,
         summary=summary,
         key_points=key_points,
@@ -367,10 +442,83 @@ def synthesize_node(state: AgentState) -> dict:
         sources_used=state.get("source_statuses", []),
     )
 
+
+def _synthesize_degraded(state: AgentState) -> ParentingAdvice:
+    """Degraded synthesis: present raw collected data with a disclaimer."""
+    trend = state.get("trend_analysis")
+    medical = state.get("medical_insight")
+    social = state.get("social_insight")
+    critique = state.get("critique_result")
+
+    question = state.get("question", "")
+    confidence = critique.confidence_score if critique else 0.3
+
+    # Collect raw sources for direct display
+    raw_sources: list[str] = []
+    if medical and medical.raw_kb_snippets:
+        for snippet in medical.raw_kb_snippets:
+            raw_sources.append(f"[Medical KB] {snippet}")
+    if social and social.raw_social_posts:
+        for post in social.raw_social_posts:
+            raw_sources.append(f"[Social] {post}")
+    if trend:
+        raw_sources.append(f"[Data Analysis] {trend.summary}")
+
+    # Minimal key points
+    key_points: list[str] = []
+    if trend:
+        key_points.append(trend.summary)
+    if medical:
+        key_points.append(medical.summary)
+    if social:
+        key_points.append(social.summary)
+
+    return ParentingAdvice(
+        question=question,
+        summary=(
+            "Our system could not produce a fully synthesized answer with sufficient confidence. "
+            "Below are the raw data collected from our sources. "
+            "Please consult your pediatrician for personalized guidance."
+        ),
+        key_points=key_points,
+        action_items=["Consult your pediatrician for personalized guidance."],
+        risk_level=medical.risk_level if medical else RiskLevel.LOW,
+        confidence_score=confidence,
+        citations=[],
+        sources_used=state.get("source_statuses", []),
+        is_degraded=True,
+        raw_sources=raw_sources,
+        disclaimer=(
+            "IMPORTANT: The system could not synthesize a high-confidence answer. "
+            "The raw data above is provided for reference only. "
+            "Always consult your pediatrician for health concerns."
+        ),
+    )
+
+
+def synthesize_node(state: AgentState) -> dict:
+    """Assemble final ParentingAdvice from all agent outputs.
+
+    Switches to degraded mode when medical insight is missing or
+    critique confidence is below 0.4.
+    """
+    medical = state.get("medical_insight")
+    critique = state.get("critique_result")
+    confidence = critique.confidence_score if critique else 0.3
+
+    # Degraded mode: medical missing or very low confidence
+    if medical is None or confidence < 0.4:
+        advice = _synthesize_degraded(state)
+    else:
+        advice = _synthesize_normal(state)
+
     return {
         "final_advice": advice,
         "messages": [AIMessage(
-            content=f"[synthesize] Final advice delivered (confidence={confidence})",
+            content=(
+                f"[synthesize] Final advice delivered "
+                f"(confidence={advice.confidence_score}, degraded={advice.is_degraded})"
+            ),
             name="synthesize",
         )],
     }

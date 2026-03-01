@@ -69,6 +69,14 @@ class MedicalInsight(BaseModel):
     risk_level: RiskLevel = RiskLevel.LOW
     recommendations: list[str] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
+    kb_available: bool | None = Field(
+        default=None,
+        description="True=RAG succeeded, False=LLM-only/failed, None=stub",
+    )
+    raw_kb_snippets: list[str] = Field(
+        default_factory=list,
+        description="Raw document excerpts for degraded-mode display",
+    )
 
 
 class SocialInsight(BaseModel):
@@ -78,6 +86,14 @@ class SocialInsight(BaseModel):
     consensus_points: list[str] = Field(default_factory=list)
     sample_size: int = Field(default=0, description="Number of posts/discussions analyzed")
     citations: list[Citation] = Field(default_factory=list)
+    agrees_with_medical: bool | None = Field(
+        default=None,
+        description="True=agrees, False=contradicts, None=unknown",
+    )
+    raw_social_posts: list[str] = Field(
+        default_factory=list,
+        description="Raw post snippets for degraded-mode display",
+    )
 
 
 class CritiqueResult(BaseModel):
@@ -100,6 +116,11 @@ class ParentingAdvice(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
     citations: list[Citation] = Field(default_factory=list)
     sources_used: list[SourceStatus] = Field(default_factory=list)
+    is_degraded: bool = False
+    raw_sources: list[str] = Field(
+        default_factory=list,
+        description="Raw source snippets shown when synthesis is degraded",
+    )
     disclaimer: str = (
         "This is AI-generated guidance and not a substitute for professional medical advice. "
         "Always consult your pediatrician for health concerns."

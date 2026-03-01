@@ -216,6 +216,7 @@ def _run_stub(state: AgentState) -> MedicalInsight:
                     detail="Common reactions and when to call the doctor",
                 ),
             ],
+            kb_available=None,  # stub — simulated success
         )
 
     return MedicalInsight(
@@ -236,6 +237,7 @@ def _run_stub(state: AgentState) -> MedicalInsight:
                 detail="Normal feeding variation in 4-month-olds",
             ),
         ],
+        kb_available=None,  # stub — simulated success
     )
 
 
@@ -245,7 +247,9 @@ def _run_llm_only(state: AgentState) -> MedicalInsight:
         "No knowledge base configured. Reason from your medical training knowledge. "
         "Cite well-known authoritative sources (AAP, CDC, WHO) where applicable."
     )
-    return _call_llm(state, context_block)
+    insight = _call_llm(state, context_block)
+    insight.kb_available = False
+    return insight
 
 
 def _run_rag(state: AgentState) -> MedicalInsight:
@@ -282,7 +286,12 @@ def _run_rag(state: AgentState) -> MedicalInsight:
     kb_citations = _extract_citations_from_docs(docs)
     context_block = _format_docs_as_context(docs)
 
+    # Capture raw KB snippets for degraded-mode display
+    raw_kb_snippets = [doc.page_content[:500] for doc in docs if doc.page_content]
+
     insight = _call_llm(state, context_block)
+    insight.kb_available = True
+    insight.raw_kb_snippets = raw_kb_snippets
 
     # Merge KB citations, deduplicating by reference
     existing_refs = {c.reference for c in insight.citations}
@@ -308,22 +317,32 @@ def medical_expert_node(state: AgentState) -> dict:
     """
     if config.use_mock_data:
         insight = _run_stub(state)
-        source_status = SourceStatus(
+        kb_status = SourceStatus(
             source="Medical Knowledge Base",
             status=SourceStatusCode.OK,
             message="Medical assessment based on built-in clinical guidelines.",
         )
+        llm_status = SourceStatus(
+            source="Medical Expert LLM",
+            status=SourceStatusCode.OK,
+            message="Medical expert reasoning based on built-in knowledge.",
+        )
     elif config.bedrock_kb_id:
         try:
             insight = _run_rag(state)
-            source_status = SourceStatus(
+            kb_status = SourceStatus(
                 source="Medical Knowledge Base",
                 status=SourceStatusCode.OK,
                 message="Retrieved and analyzed authoritative medical references.",
             )
+            llm_status = SourceStatus(
+                source="Medical Expert LLM",
+                status=SourceStatusCode.OK,
+                message="Medical expert interpreted retrieved knowledge base documents.",
+            )
         except _KBRetrievalFailed:
             insight = _run_llm_only(state)
-            source_status = SourceStatus(
+            kb_status = SourceStatus(
                 source="Medical Knowledge Base",
                 status=SourceStatusCode.FALLBACK,
                 message=(
@@ -332,9 +351,14 @@ def medical_expert_node(state: AgentState) -> dict:
                     "retrieved authoritative documents."
                 ),
             )
+            llm_status = SourceStatus(
+                source="Medical Expert LLM",
+                status=SourceStatusCode.OK,
+                message="Medical expert reasoning from general training knowledge (no KB).",
+            )
     else:
         insight = _run_llm_only(state)
-        source_status = SourceStatus(
+        kb_status = SourceStatus(
             source="Medical Knowledge Base",
             status=SourceStatusCode.FALLBACK,
             message=(
@@ -343,11 +367,16 @@ def medical_expert_node(state: AgentState) -> dict:
                 "retrieved authoritative documents."
             ),
         )
+        llm_status = SourceStatus(
+            source="Medical Expert LLM",
+            status=SourceStatusCode.OK,
+            message="Medical expert reasoning from general training knowledge (no KB).",
+        )
 
     return {
         "medical_insight": insight,
         "agents_completed": ["medical_expert"],
-        "source_statuses": [source_status],
+        "source_statuses": [kb_status, llm_status],
         "messages": [AIMessage(
             content=f"[medical_expert] {insight.summary}",
             name="medical_expert",

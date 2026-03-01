@@ -263,6 +263,7 @@ def _run_stub(state: AgentState) -> SocialInsight:
                     detail="Aggregated from top-rated posts in #婴儿疫苗 and #宝宝打针后 tags",
                 ),
             ],
+            agrees_with_medical=True,
         )
 
     return SocialInsight(
@@ -282,6 +283,7 @@ def _run_stub(state: AgentState) -> SocialInsight:
                 detail="Aggregated from #四个月宝宝 tag",
             ),
         ],
+        agrees_with_medical=True,
     )
 
 
@@ -337,6 +339,13 @@ def _run_mcp(state: AgentState) -> tuple[SocialInsight, SourceStatus]:
     context_block = _format_notes_as_context(notes)
     sample_size = _compute_sample_size(notes)
 
+    # Capture raw post snippets for degraded-mode display
+    raw_social_posts = []
+    for note in notes:
+        title = note.get("title", "Untitled")
+        content = note.get("content", note.get("desc", ""))[:300]
+        raw_social_posts.append(f"{title}: {content}")
+
     insight = _call_llm(state, context_block)
 
     # Merge XHS citations, deduplicating by reference
@@ -348,6 +357,7 @@ def _run_mcp(state: AgentState) -> tuple[SocialInsight, SourceStatus]:
 
     # Override sample_size with real engagement total
     insight.sample_size = sample_size
+    insight.raw_social_posts = raw_social_posts
 
     if failed_detail_count > 0:
         status = SourceStatus(

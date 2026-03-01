@@ -99,7 +99,7 @@ class TestMedicalExpertStatus:
         }
 
     def test_stub_returns_ok(self, monkeypatch):
-        """Mock mode (stub) should return OK status."""
+        """Mock mode (stub) should return 2 OK statuses (KB + LLM)."""
         import agent.agents.medical_expert as mod
         from agent.config import AgentConfig
 
@@ -107,12 +107,14 @@ class TestMedicalExpertStatus:
 
         result = mod.medical_expert_node(self._make_state())
         statuses = result["source_statuses"]
-        assert len(statuses) == 1
+        assert len(statuses) == 2
         assert statuses[0].status == SourceStatusCode.OK
         assert statuses[0].source == "Medical Knowledge Base"
+        assert statuses[1].status == SourceStatusCode.OK
+        assert statuses[1].source == "Medical Expert LLM"
 
     def test_kb_failure_returns_fallback(self, monkeypatch):
-        """When KB retrieval fails, should return FALLBACK status."""
+        """When KB retrieval fails, should return FALLBACK for KB and OK for LLM."""
         import agent.agents.medical_expert as mod
         from agent.config import AgentConfig
 
@@ -132,17 +134,20 @@ class TestMedicalExpertStatus:
             risk_level=RiskLevel.LOW,
             recommendations=[],
             citations=[],
+            kb_available=False,
         )
         monkeypatch.setattr(mod, "_run_llm_only", lambda state: fake_insight)
 
         result = mod.medical_expert_node(self._make_state())
         statuses = result["source_statuses"]
-        assert len(statuses) == 1
+        assert len(statuses) == 2
         assert statuses[0].status == SourceStatusCode.FALLBACK
         assert "failed" in statuses[0].message.lower()
+        assert statuses[1].status == SourceStatusCode.OK
+        assert statuses[1].source == "Medical Expert LLM"
 
     def test_no_kb_configured_returns_fallback(self, monkeypatch):
-        """When no KB is configured, should return FALLBACK status."""
+        """When no KB is configured, should return FALLBACK for KB and OK for LLM."""
         import agent.agents.medical_expert as mod
         from agent.config import AgentConfig
 
@@ -155,14 +160,17 @@ class TestMedicalExpertStatus:
             risk_level=RiskLevel.LOW,
             recommendations=[],
             citations=[],
+            kb_available=False,
         )
         monkeypatch.setattr(mod, "_run_llm_only", lambda state: fake_insight)
 
         result = mod.medical_expert_node(self._make_state())
         statuses = result["source_statuses"]
-        assert len(statuses) == 1
+        assert len(statuses) == 2
         assert statuses[0].status == SourceStatusCode.FALLBACK
         assert "configured" in statuses[0].message.lower()
+        assert statuses[1].status == SourceStatusCode.OK
+        assert statuses[1].source == "Medical Expert LLM"
 
 
 # ---------------------------------------------------------------------------
@@ -322,14 +330,15 @@ class TestEndToEndTransparency:
         result = app.invoke(initial_state, config)
         advice = result.get("final_advice")
         assert advice is not None, "Expected final_advice in result"
-        assert len(advice.sources_used) == 4, (
-            f"Expected 4 source statuses (data_scientist, medical, social, critique), "
+        assert len(advice.sources_used) == 5, (
+            f"Expected 5 source statuses (data_scientist, medical_kb, medical_llm, social, critique), "
             f"got {len(advice.sources_used)}: {[s.source for s in advice.sources_used]}"
         )
 
         sources_by_name = {s.source: s for s in advice.sources_used}
         assert "Baby Data Analysis" in sources_by_name
         assert "Medical Knowledge Base" in sources_by_name
+        assert "Medical Expert LLM" in sources_by_name
         assert "Social Cross-Check (Xiaohongshu)" in sources_by_name
         assert "Quality Review" in sources_by_name
 

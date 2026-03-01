@@ -103,12 +103,14 @@ Based on the above information, synthesize social consensus as a JSON object wit
 - `consensus_points`: A list of 3-5 key consensus points from the community. Include both majority AND minority viewpoints.
 - `sample_size`: Number of posts/discussions analyzed (use engagement totals if available).
 - `citations`: A list of citation objects, each with `source_type` ("xhs_post"), `reference`, and optional `detail`.
+- `agrees_with_medical`: A boolean indicating whether the social consensus broadly agrees with the Medical Expert's assessment. Set to `true` if the community experience supports the medical guidance, `false` if the community experience contradicts or conflicts with it.
 
 Rules:
 - ALWAYS cite sources (e.g., [XHS Consensus, N=500]).
 - Report both majority and minority viewpoints.
 - Never substitute social consensus for medical advice.
 - Flag when social consensus DISAGREES with medical guidance from the Medical Expert.
+- Set `agrees_with_medical` to `false` when social consensus contradicts the Medical Expert.
 - Tailor observations to the baby's specific age ({baby_age_months} months).
 """
 
@@ -128,8 +130,39 @@ Rules:
 - Interrupt for human review if confidence < 0.8 or risk is HIGH.
 """
 
-CRITIQUE_PROMPT = """\
-Review the following parenting advice for quality and safety:
+CRITIQUE_SYSTEM = """\
+You are a Safety & Quality Judge in a multi-agent parenting advisory system.
+
+Your sole job is to evaluate draft advice produced by three specialist agents \
+(Data Scientist, Medical Expert, Social Researcher) before it reaches a parent.
+
+## Scoring Dimensions (each 1–5)
+1. **Safety** — Does the advice avoid harmful recommendations? Could a parent \
+misinterpret it in a dangerous way? Safety is your TOP priority.
+2. **Medical Accuracy** — Are medical claims grounded in authoritative sources \
+(AAP, CDC, WHO)? Are dosages, timelines, and thresholds correct?
+3. **Source Grounding** — Does every factual claim cite its source? \
+Are citations specific (e.g., [AAP Book, p.42]) rather than vague?
+
+## Additional Checks
+- If medical and social insights **disagree**, the advice MUST explicitly \
+acknowledge the conflict and explain why the medical position takes precedence.
+- If any agent output is **missing**, flag it as an issue.
+- Recommendations must be age-appropriate for the baby.
+
+## Output Rules
+- Set `approved = true` only when **all three scores are ≥ 4** and there are \
+no critical safety issues.
+- `confidence_score` should reflect overall quality (0.0–1.0).
+- List every problem in `issues` and every improvement idea in `suggestions`.
+"""
+
+CRITIQUE_HUMAN = """\
+Review the following parenting advice for quality and safety.
+
+## Parent Context
+- **Question:** {question}
+- **Baby age:** {baby_age_months} months
 
 ## Data Analysis
 {trend_analysis}
