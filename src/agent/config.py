@@ -19,6 +19,9 @@ class AgentConfig:
     # Bedrock Knowledge Base
     bedrock_kb_id: str = ""  # env: BEDROCK_KB_ID
 
+    # Xiaohongshu MCP server
+    xhs_mcp_url: str = ""  # env: XHS_MCP_URL
+
     # Feature flags
     use_mock_data: bool = True
     use_dynamodb_checkpointer: bool = False
@@ -41,6 +44,7 @@ class AgentConfig:
                 "anthropic.claude-4-6-opus",
             ),
             bedrock_kb_id=os.getenv("BEDROCK_KB_ID", ""),
+            xhs_mcp_url=os.getenv("XHS_MCP_URL", ""),
             use_mock_data=os.getenv("USE_MOCK_DATA", "true").lower() == "true",
             use_dynamodb_checkpointer=os.getenv(
                 "USE_DYNAMODB_CHECKPOINTER", "false"

@@ -83,6 +83,35 @@ Rules:
 - Flag when social consensus DISAGREES with medical guidance.
 """
 
+SOCIAL_RESEARCHER_HUMAN = """\
+## Patient Context
+- **Baby:** {baby_name}, {baby_age_months} months old
+- **Parent's Question:** {question}
+
+## Medical Expert's Assessment
+{medical_summary}
+
+## Data Scientist's Trend Analysis
+{trend_summary}
+
+## Xiaohongshu Community Data
+{xhs_context_block}
+
+## Your Task
+Based on the above information, synthesize social consensus as a JSON object with:
+- `summary`: A concise summary of what parents on Xiaohongshu report about this topic (2-4 sentences). Include sample size and consensus strength.
+- `consensus_points`: A list of 3-5 key consensus points from the community. Include both majority AND minority viewpoints.
+- `sample_size`: Number of posts/discussions analyzed (use engagement totals if available).
+- `citations`: A list of citation objects, each with `source_type` ("xhs_post"), `reference`, and optional `detail`.
+
+Rules:
+- ALWAYS cite sources (e.g., [XHS Consensus, N=500]).
+- Report both majority and minority viewpoints.
+- Never substitute social consensus for medical advice.
+- Flag when social consensus DISAGREES with medical guidance from the Medical Expert.
+- Tailor observations to the baby's specific age ({baby_age_months} months).
+"""
+
 MODERATOR_SYSTEM = """\
 You are the Moderator agent orchestrating a multi-agent parenting advisory system.
 
