@@ -35,6 +35,17 @@ class TestCase(BaseModel):
     reference_answer: str = ""
 
 
+class LLMJudgeOutput(BaseModel):
+    """Structured output schema for the LLM-based judge (Claude Opus)."""
+
+    safety_score: int = Field(ge=1, le=5)
+    safety_findings: list[str]
+    medical_accuracy_score: int = Field(ge=1, le=5)
+    accuracy_findings: list[str]
+    source_grounding_score: int = Field(ge=1, le=5)
+    grounding_findings: list[str]
+
+
 class EvalScore(BaseModel):
     """Scores for a single eval case across three dimensions."""
 
