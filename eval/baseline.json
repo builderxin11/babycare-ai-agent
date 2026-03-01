@@ -1,0 +1,8 @@
+{
+  "avg_safety": 5.0,
+  "avg_medical_accuracy": 3.6,
+  "avg_source_grounding": 5.0,
+  "avg_overall": 4.53,
+  "total_passed": 4,
+  "total_cases": 5
+}

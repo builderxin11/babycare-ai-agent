@@ -16,6 +16,9 @@ class AgentConfig:
     sonnet_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
     opus_model_id: str = "anthropic.claude-4-6-opus"
 
+    # Bedrock Knowledge Base
+    bedrock_kb_id: str = ""  # env: BEDROCK_KB_ID
+
     # Feature flags
     use_mock_data: bool = True
     use_dynamodb_checkpointer: bool = False
@@ -37,6 +40,7 @@ class AgentConfig:
                 "OPUS_MODEL_ID",
                 "anthropic.claude-4-6-opus",
             ),
+            bedrock_kb_id=os.getenv("BEDROCK_KB_ID", ""),
             use_mock_data=os.getenv("USE_MOCK_DATA", "true").lower() == "true",
             use_dynamodb_checkpointer=os.getenv(
                 "USE_DYNAMODB_CHECKPOINTER", "false"

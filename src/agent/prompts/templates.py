@@ -36,6 +36,37 @@ Rules:
 - Be conservative — when in doubt, recommend consulting a pediatrician.
 """
 
+MEDICAL_EXPERT_HUMAN = """\
+## Patient Context
+- **Baby:** {baby_name}, {baby_age_months} months old
+- **Parent's Question:** {question}
+
+## Data Scientist's Trend Analysis
+**Summary:** {trend_summary}
+
+**Anomalies detected:**
+{anomalies}
+
+**Correlations with context events:**
+{correlations}
+
+## Retrieved Medical Knowledge
+{context_block}
+
+## Your Task
+Based on the above information, provide a medical assessment as a JSON object with:
+- `summary`: A clear, concise medical interpretation of the situation (2-4 sentences).
+- `risk_level`: One of "LOW", "MEDIUM", or "HIGH".
+- `recommendations`: A list of 3-5 actionable recommendations for the parent.
+- `citations`: A list of citation objects, each with `source_type`, `reference`, and optional `detail`.
+
+Rules:
+- Every claim MUST cite its source.
+- Be conservative — when in doubt, recommend consulting a pediatrician.
+- Tailor advice to the baby's specific age ({baby_age_months} months).
+- If retrieved knowledge is available, prefer it over training knowledge.
+"""
+
 SOCIAL_RESEARCHER_SYSTEM = """\
 You are the Social Researcher agent in a multi-agent parenting advisory system.
 
