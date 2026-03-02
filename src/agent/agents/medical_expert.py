@@ -125,6 +125,7 @@ def _format_trend_for_prompt(state: AgentState) -> dict[str, str]:
             "trend_summary": "No trend analysis available.",
             "anomalies": "None detected.",
             "correlations": "None detected.",
+            "data_summary": "No data available.",
         }
 
     anomaly_lines = []
@@ -140,6 +141,7 @@ def _format_trend_for_prompt(state: AgentState) -> dict[str, str]:
         "trend_summary": trend.summary,
         "anomalies": "\n".join(anomaly_lines) if anomaly_lines else "None detected.",
         "correlations": "\n".join(corr_lines),
+        "data_summary": trend.data_summary or "No data available.",
     }
 
 

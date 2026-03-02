@@ -187,12 +187,15 @@ def _format_prompt_context(state: AgentState) -> dict[str, str]:
     trend = state.get("trend_analysis")
     trend_summary = trend.summary if trend else "No trend analysis available."
 
+    data_summary = trend.data_summary if trend and trend.data_summary else "No data available."
+
     return {
         "baby_name": state.get("baby_name", "Baby"),
         "baby_age_months": str(state.get("baby_age_months", "unknown")),
         "question": state.get("question", ""),
         "medical_summary": medical_summary,
         "trend_summary": trend_summary,
+        "data_summary": data_summary,
     }
 
 

@@ -67,6 +67,9 @@ MEDICAL_EXPERT_HUMAN = """\
 **Correlations with context events:**
 {correlations}
 
+## Raw Data Summary
+{data_summary}
+
 ## Retrieved Medical Knowledge
 {context_block}
 
@@ -112,6 +115,9 @@ SOCIAL_RESEARCHER_HUMAN = """\
 
 ## Data Scientist's Trend Analysis
 {trend_summary}
+
+## Raw Data Summary
+{data_summary}
 
 ## Xiaohongshu Community Data
 {xhs_context_block}

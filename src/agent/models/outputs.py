@@ -54,6 +54,10 @@ class TrendAnalysis(BaseModel):
     """Output of the Data Scientist agent."""
 
     summary: str
+    data_summary: str = Field(
+        default="",
+        description="Human-readable summary of raw daily aggregates and context events",
+    )
     anomalies: list[TrendAnomaly] = Field(default_factory=list)
     correlations: list[str] = Field(
         default_factory=list,

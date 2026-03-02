@@ -150,6 +150,41 @@ def _correlate_events(
 # ---------------------------------------------------------------------------
 
 
+def _build_data_summary(
+    daily: dict[str, dict[str, float]],
+    events: list[ContextEvent],
+    logs: list[PhysiologyLog],
+) -> str:
+    """Build a human-readable summary of raw daily aggregates and context events."""
+    lines: list[str] = []
+
+    if daily:
+        lines.append("Daily totals (last 7 days):")
+        for day_key in sorted(daily.keys()):
+            day_data = daily[day_key]
+            feeding = day_data.get("feeding_ml", 0)
+            sleep = day_data.get("sleep_min", 0)
+            diapers = int(day_data.get("diaper_count", 0))
+            lines.append(
+                f"- {day_key}: feeding {feeding:.0f}ml, sleep {sleep:.0f}min, diapers {diapers}"
+            )
+    else:
+        lines.append("No physiology data recorded.")
+
+    if events:
+        lines.append("")
+        lines.append("Context events:")
+        for event in sorted(events, key=lambda e: e.start_date):
+            lines.append(
+                f"- {event.start_date.isoformat()}: {event.type.value} — \"{event.title}\""
+            )
+    else:
+        lines.append("")
+        lines.append("No context events recorded.")
+
+    return "\n".join(lines)
+
+
 def _analyze(
     logs: list[PhysiologyLog],
     events: list[ContextEvent],
@@ -173,8 +208,11 @@ def _analyze(
     if correlations:
         summary += f" Found {len(correlations)} correlation(s) with context events."
 
+    data_summary = _build_data_summary(daily, events, logs)
+
     trend = TrendAnalysis(
         summary=summary,
+        data_summary=data_summary,
         anomalies=anomalies,
         correlations=correlations,
         citations=[Citation(
