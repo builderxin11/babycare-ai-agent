@@ -71,7 +71,7 @@ class MedicalInsight(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     kb_available: bool | None = Field(
         default=None,
-        description="True=RAG succeeded, False=LLM-only/failed, None=stub",
+        description="True=RAG succeeded, False=LLM-only/KB failed, None=unknown",
     )
     raw_kb_snippets: list[str] = Field(
         default_factory=list,

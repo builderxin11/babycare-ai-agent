@@ -10,7 +10,6 @@ from agent.agents.medical_expert import (
     _build_retrieval_query,
     _extract_citations_from_docs,
     _format_docs_as_context,
-    _run_stub,
     medical_expert_node,
 )
 from agent.models.outputs import (
@@ -67,50 +66,6 @@ def _make_trend(**overrides) -> TrendAnalysis:
 def _make_doc(content: str = "Sample content", **meta) -> Document:
     """Create a langchain Document for testing."""
     return Document(page_content=content, metadata=meta)
-
-
-# ---------------------------------------------------------------------------
-# TestMedicalExpertStub
-# ---------------------------------------------------------------------------
-
-
-class TestMedicalExpertStub:
-    """Tests for the stub (mock data) execution path."""
-
-    def test_produces_medical_insight(self):
-        """Node should produce a MedicalInsight in its return dict."""
-        result = medical_expert_node(_make_state())
-        assert "medical_insight" in result
-        assert isinstance(result["medical_insight"], MedicalInsight)
-
-    def test_vaccine_correlation_detected(self):
-        """When trend has vaccine correlation, stub should return vaccine-specific advice."""
-        trend = _make_trend(correlations=["DTaP Vaccine (2025-01-14)"])
-        result = medical_expert_node(_make_state(trend_analysis=trend))
-        insight = result["medical_insight"]
-        assert "vaccination" in insight.summary.lower() or "vaccine" in insight.summary.lower()
-        assert insight.risk_level == RiskLevel.LOW
-
-    def test_no_vaccine_correlation(self):
-        """Without vaccine correlation, stub should return generic monitoring advice."""
-        trend = _make_trend(correlations=["Growth spurt phase"])
-        result = medical_expert_node(_make_state(trend_analysis=trend))
-        insight = result["medical_insight"]
-        assert "monitor" in insight.summary.lower()
-
-    def test_marks_agent_completed(self):
-        """Node should add 'medical_expert' to agents_completed."""
-        result = medical_expert_node(_make_state())
-        assert "medical_expert" in result["agents_completed"]
-
-    def test_returns_ai_message(self):
-        """Node should include an AIMessage in messages."""
-        result = medical_expert_node(_make_state())
-        assert len(result["messages"]) == 1
-        msg = result["messages"][0]
-        assert isinstance(msg, AIMessage)
-        assert msg.name == "medical_expert"
-        assert "[medical_expert]" in msg.content
 
 
 # ---------------------------------------------------------------------------
@@ -238,14 +193,11 @@ class TestMedicalExpertFallback:
     """Test fallback behaviour for KB and LLM failures."""
 
     def test_kb_failure_falls_back_to_llm_only(self, monkeypatch):
-        """If KB retrieval fails, _run_rag should fall back to _run_llm_only."""
+        """If KB retrieval fails, should fall back to _run_llm_only."""
         import agent.agents.medical_expert as mod
         from agent.config import AgentConfig
 
-        mock_config = AgentConfig(
-            use_mock_data=False,
-            bedrock_kb_id="fake-kb-id",
-        )
+        mock_config = AgentConfig(bedrock_kb_id="fake-kb-id")
         monkeypatch.setattr(mod, "config", mock_config)
 
         # Track whether _run_llm_only was called
@@ -264,10 +216,6 @@ class TestMedicalExpertFallback:
         monkeypatch.setattr(mod, "_run_llm_only", _fake_llm_only)
 
         # Make the KB retriever import & invoke raise inside _run_rag
-        def _boom_rag(state):
-            return mod._run_rag(state)
-
-        # Patch AmazonKnowledgeBasesRetriever to raise on construction
         import types
         fake_langchain_aws = types.ModuleType("langchain_aws")
 
@@ -288,10 +236,7 @@ class TestMedicalExpertFallback:
         import agent.agents.medical_expert as mod
         from agent.config import AgentConfig
 
-        mock_config = AgentConfig(
-            use_mock_data=False,
-            bedrock_kb_id="",  # LLM-only path
-        )
+        mock_config = AgentConfig(bedrock_kb_id="")  # LLM-only path
         monkeypatch.setattr(mod, "config", mock_config)
 
         def _boom(state):
@@ -301,3 +246,27 @@ class TestMedicalExpertFallback:
 
         with pytest.raises(RuntimeError, match="Bedrock model invocation failed"):
             medical_expert_node(_make_state())
+
+    def test_no_kb_returns_fallback_status(self, monkeypatch):
+        """Without KB configured, should return FALLBACK for KB and OK for LLM."""
+        import agent.agents.medical_expert as mod
+        from agent.config import AgentConfig
+
+        mock_config = AgentConfig(bedrock_kb_id="")
+        monkeypatch.setattr(mod, "config", mock_config)
+
+        fake_insight = MedicalInsight(
+            summary="LLM-only no KB",
+            risk_level=RiskLevel.LOW,
+            recommendations=[],
+            citations=[],
+            kb_available=False,
+        )
+        monkeypatch.setattr(mod, "_run_llm_only", lambda state: fake_insight)
+
+        result = medical_expert_node(_make_state())
+        statuses = result["source_statuses"]
+        assert len(statuses) == 2
+        assert statuses[0].status.value == "fallback"
+        assert "configured" in statuses[0].message.lower()
+        assert statuses[1].source == "Medical Expert LLM"

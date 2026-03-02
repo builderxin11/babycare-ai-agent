@@ -22,8 +22,12 @@ class AgentConfig:
     # Xiaohongshu MCP server
     xhs_mcp_url: str = ""  # env: XHS_MCP_URL
 
+    # DynamoDB table names (Amplify Gen 2 dynamic names)
+    physiology_log_table: str = ""  # env: PHYSIOLOGY_LOG_TABLE
+    context_event_table: str = ""  # env: CONTEXT_EVENT_TABLE
+    data_lookback_days: int = 7  # env: DATA_LOOKBACK_DAYS
+
     # Feature flags
-    use_mock_data: bool = True
     use_dynamodb_checkpointer: bool = False
 
     # Agent thresholds
@@ -45,7 +49,9 @@ class AgentConfig:
             ),
             bedrock_kb_id=os.getenv("BEDROCK_KB_ID", ""),
             xhs_mcp_url=os.getenv("XHS_MCP_URL", ""),
-            use_mock_data=os.getenv("USE_MOCK_DATA", "true").lower() == "true",
+            physiology_log_table=os.getenv("PHYSIOLOGY_LOG_TABLE", ""),
+            context_event_table=os.getenv("CONTEXT_EVENT_TABLE", ""),
+            data_lookback_days=int(os.getenv("DATA_LOOKBACK_DAYS", "7")),
             use_dynamodb_checkpointer=os.getenv(
                 "USE_DYNAMODB_CHECKPOINTER", "false"
             ).lower()

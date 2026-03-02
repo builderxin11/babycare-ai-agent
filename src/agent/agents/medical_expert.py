@@ -1,11 +1,11 @@
 """Medical Expert agent — Bedrock RAG implementation.
 
-Three-tier execution:
-  1. use_mock_data=True        -> _run_stub()       (hardcoded, no AWS)
-  2. use_mock_data=False, no KB -> _run_llm_only()   (ChatBedrockConverse, no retrieval)
-  3. use_mock_data=False, KB set -> _run_rag()        (KB retrieve -> LLM interpret)
+Two-tier execution:
+  1. KB configured   -> _run_rag()       (KB retrieve -> LLM interpret)
+     KB retrieval fails -> _run_llm_only() (ChatBedrockConverse, no retrieval)
+  2. No KB configured -> _run_llm_only()  (ChatBedrockConverse, no retrieval)
 
-Any Bedrock exception falls back to _run_stub() so the graph never crashes.
+Any Bedrock LLM exception propagates — the graph should surface the failure.
 """
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ def _format_trend_for_prompt(state: AgentState) -> dict[str, str]:
 
 def _call_llm(state: AgentState, context_block: str) -> MedicalInsight:
     """Invoke ChatBedrockConverse with structured output."""
-    # Lazy import so mock mode never touches AWS SDK
+    # Lazy import so unconfigured environments never touch AWS SDK
     from langchain_aws import ChatBedrockConverse
 
     llm = ChatBedrockConverse(
@@ -180,67 +180,6 @@ def _call_llm(state: AgentState, context_block: str) -> MedicalInsight:
 # ---------------------------------------------------------------------------
 
 
-def _run_stub(state: AgentState) -> MedicalInsight:
-    """Return hardcoded post-vaccine guidance (original stub logic)."""
-    trend = state.get("trend_analysis")
-
-    has_vaccine_correlation = False
-    if trend and trend.correlations:
-        has_vaccine_correlation = any(
-            "VACCINE" in c.upper() for c in trend.correlations
-        )
-
-    if has_vaccine_correlation:
-        return MedicalInsight(
-            summary=(
-                "Post-vaccination behavioral changes (reduced feeding, increased sleepiness) "
-                "are normal and expected within 48-72 hours of DTaP vaccination. "
-                "These are signs of a healthy immune response."
-            ),
-            risk_level=RiskLevel.LOW,
-            recommendations=[
-                "Continue offering regular feedings; slight reduction (10-20%) is normal post-vaccine.",
-                "Extra sleep is expected — allow baby to rest but maintain wake windows for feeding.",
-                "Monitor for fever; acetaminophen (infant Tylenol) may be given per pediatrician's dosing.",
-                "Seek immediate care if: fever >101\u00b0F persists >48h, inconsolable crying >3h, or refusal to eat >24h.",
-            ],
-            citations=[
-                Citation(
-                    source_type="book",
-                    reference="AAP Immunization Guide, Chapter 4: Post-Vaccination Care",
-                    detail="Expected side effects of DTaP in infants 2-6 months",
-                ),
-                Citation(
-                    source_type="medical",
-                    reference="CDC Vaccine Information Statement: DTaP",
-                    detail="Common reactions and when to call the doctor",
-                ),
-            ],
-            kb_available=None,  # stub — simulated success
-        )
-
-    return MedicalInsight(
-        summary=(
-            "The observed changes in feeding and sleep patterns should be monitored. "
-            "For a 4-month-old, variations can be related to growth spurts or developmental milestones."
-        ),
-        risk_level=RiskLevel.LOW,
-        recommendations=[
-            "Track feeding volumes for the next 48 hours.",
-            "Ensure adequate wet diapers (6+ per day) as hydration indicator.",
-            "Consult pediatrician if patterns persist beyond 3 days.",
-        ],
-        citations=[
-            Citation(
-                source_type="book",
-                reference="AAP Bright Futures: Nutrition, 4th Edition",
-                detail="Normal feeding variation in 4-month-olds",
-            ),
-        ],
-        kb_available=None,  # stub — simulated success
-    )
-
-
 def _run_llm_only(state: AgentState) -> MedicalInsight:
     """Use ChatBedrockConverse without KB retrieval."""
     context_block = (
@@ -255,10 +194,10 @@ def _run_llm_only(state: AgentState) -> MedicalInsight:
 def _run_rag(state: AgentState) -> MedicalInsight:
     """Full RAG: retrieve from Bedrock KB, then LLM interpret.
 
-    If KB retrieval fails, falls back to LLM-only (no retrieval).
+    If KB retrieval fails, raises _KBRetrievalFailed.
     If the LLM call itself fails, the exception propagates.
     """
-    # Lazy import so mock mode never touches AWS SDK
+    # Lazy import so unconfigured environments never touch AWS SDK
     from langchain_aws import AmazonKnowledgeBasesRetriever
 
     docs: list[Document] = []
@@ -311,23 +250,11 @@ def _run_rag(state: AgentState) -> MedicalInsight:
 def medical_expert_node(state: AgentState) -> dict:
     """Provide medical guidance based on trend analysis.
 
-    Routes to stub, LLM-only, or full RAG depending on configuration.
+    Routes to LLM-only or full RAG depending on configuration.
     KB retrieval errors fall back to LLM-only.
     Bedrock LLM errors propagate — the graph should surface the failure.
     """
-    if config.use_mock_data:
-        insight = _run_stub(state)
-        kb_status = SourceStatus(
-            source="Medical Knowledge Base",
-            status=SourceStatusCode.OK,
-            message="Medical assessment based on built-in clinical guidelines.",
-        )
-        llm_status = SourceStatus(
-            source="Medical Expert LLM",
-            status=SourceStatusCode.OK,
-            message="Medical expert reasoning based on built-in knowledge.",
-        )
-    elif config.bedrock_kb_id:
+    if config.bedrock_kb_id:
         try:
             insight = _run_rag(state)
             kb_status = SourceStatus(

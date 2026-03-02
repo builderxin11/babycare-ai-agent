@@ -5,9 +5,10 @@ Uses Pydantic with camelCase aliases for seamless DynamoDB ↔ Python interop.
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .enums import BabyGender, ContextEventType, PhysiologyLogType, PhysiologyLogUnit
 
@@ -53,3 +54,11 @@ class ContextEvent(BaseModel):
     end_date: date | None = Field(default=None, alias="endDate")
     metadata: dict | None = None
     notes: str | None = None
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def _parse_awsjson_metadata(cls, v: object) -> dict | None:
+        """DynamoDB AWSJSON stores dict fields as JSON strings."""
+        if isinstance(v, str):
+            return json.loads(v)
+        return v

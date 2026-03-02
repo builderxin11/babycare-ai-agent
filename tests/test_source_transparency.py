@@ -57,7 +57,7 @@ class TestSourceStatusModel:
 
 
 class TestDataScientistStatus:
-    def test_returns_ok_status(self):
+    def test_returns_fallback_status_without_tables(self):
         from agent.agents.data_scientist import data_scientist_node
 
         state = {
@@ -71,9 +71,9 @@ class TestDataScientistStatus:
         result = data_scientist_node(state)
         statuses = result["source_statuses"]
         assert len(statuses) == 1
-        assert statuses[0].status == SourceStatusCode.OK
         assert statuses[0].source == "Baby Data Analysis"
-        assert "days" in statuses[0].message
+        assert statuses[0].status == SourceStatusCode.FALLBACK
+        assert "records" not in statuses[0].message or "configured" in statuses[0].message
 
 
 # ---------------------------------------------------------------------------
@@ -98,28 +98,13 @@ class TestMedicalExpertStatus:
             ),
         }
 
-    def test_stub_returns_ok(self, monkeypatch):
-        """Mock mode (stub) should return 2 OK statuses (KB + LLM)."""
-        import agent.agents.medical_expert as mod
-        from agent.config import AgentConfig
-
-        monkeypatch.setattr(mod, "config", AgentConfig(use_mock_data=True))
-
-        result = mod.medical_expert_node(self._make_state())
-        statuses = result["source_statuses"]
-        assert len(statuses) == 2
-        assert statuses[0].status == SourceStatusCode.OK
-        assert statuses[0].source == "Medical Knowledge Base"
-        assert statuses[1].status == SourceStatusCode.OK
-        assert statuses[1].source == "Medical Expert LLM"
-
     def test_kb_failure_returns_fallback(self, monkeypatch):
         """When KB retrieval fails, should return FALLBACK for KB and OK for LLM."""
         import agent.agents.medical_expert as mod
         from agent.config import AgentConfig
 
         monkeypatch.setattr(
-            mod, "config", AgentConfig(use_mock_data=False, bedrock_kb_id="kb-123")
+            mod, "config", AgentConfig(bedrock_kb_id="kb-123")
         )
 
         # Make _run_rag raise _KBRetrievalFailed
@@ -152,7 +137,7 @@ class TestMedicalExpertStatus:
         from agent.config import AgentConfig
 
         monkeypatch.setattr(
-            mod, "config", AgentConfig(use_mock_data=False, bedrock_kb_id="")
+            mod, "config", AgentConfig(bedrock_kb_id="")
         )
 
         fake_insight = MedicalInsight(
@@ -195,7 +180,7 @@ class TestSocialResearcherStatus:
         from agent.config import AgentConfig
 
         monkeypatch.setattr(
-            mod, "config", AgentConfig(use_mock_data=False, xhs_mcp_url="")
+            mod, "config", AgentConfig(xhs_mcp_url="")
         )
 
         result = mod.social_researcher_node(self._make_state())
@@ -210,7 +195,7 @@ class TestSocialResearcherStatus:
         from agent.config import AgentConfig
 
         monkeypatch.setattr(
-            mod, "config", AgentConfig(use_mock_data=False, xhs_mcp_url="http://fake")
+            mod, "config", AgentConfig(xhs_mcp_url="http://fake")
         )
 
         # Make _fetch_xhs_notes raise
@@ -223,18 +208,6 @@ class TestSocialResearcherStatus:
         assert len(statuses) == 1
         assert statuses[0].status == SourceStatusCode.SKIPPED
         assert "unreachable" in statuses[0].message.lower()
-
-    def test_stub_returns_ok(self, monkeypatch):
-        """Mock mode (stub) should return OK status."""
-        import agent.agents.social_researcher as mod
-        from agent.config import AgentConfig
-
-        monkeypatch.setattr(mod, "config", AgentConfig(use_mock_data=True))
-
-        result = mod.social_researcher_node(self._make_state())
-        statuses = result["source_statuses"]
-        assert len(statuses) == 1
-        assert statuses[0].status == SourceStatusCode.OK
 
 
 # ---------------------------------------------------------------------------
@@ -308,9 +281,41 @@ class TestCritiqueStatus:
 
 
 class TestEndToEndTransparency:
-    """Full graph run (mock mode) should populate sources_used on final advice."""
+    """Full graph run should populate sources_used on final advice.
 
-    def test_full_graph_populates_sources_used(self):
+    Since no AWS services are configured, each agent falls back:
+    - Data Scientist: FALLBACK (no DynamoDB tables)
+    - Medical Expert: requires Bedrock LLM (patched)
+    - Social Researcher: SKIPPED (no MCP URL)
+    - Critique: requires Bedrock LLM (patched)
+    """
+
+    def test_full_graph_populates_sources_used(self, monkeypatch):
+        import agent.agents.medical_expert as med_mod
+        import agent.agents.moderator as mod_mod
+        import agent.agents.moderator as hitl_mod
+
+        # Patch medical expert to avoid Bedrock call
+        fake_medical = MedicalInsight(
+            summary="Normal post-vaccination response.",
+            risk_level=RiskLevel.LOW,
+            recommendations=["Monitor feeding", "Consult if persists"],
+            citations=[Citation(source_type="book", reference="AAP Guide")],
+            kb_available=False,
+        )
+        monkeypatch.setattr(med_mod, "_run_llm_only", lambda state: fake_medical)
+
+        # Patch critique LLM to avoid Bedrock call — fall back to rule-based
+        monkeypatch.setattr(
+            mod_mod, "_call_critique_llm",
+            lambda state: (_ for _ in ()).throw(RuntimeError("no Bedrock")),
+        )
+
+        # Lower confidence threshold so HITL doesn't interrupt
+        # (with no KB and no MCP, confidence will be low)
+        from agent.config import AgentConfig
+        monkeypatch.setattr(hitl_mod, "config", AgentConfig(confidence_threshold=0.0))
+
         from agent.graph.builder import compile_graph
 
         app = compile_graph()
@@ -330,20 +335,28 @@ class TestEndToEndTransparency:
         result = app.invoke(initial_state, config)
         advice = result.get("final_advice")
         assert advice is not None, "Expected final_advice in result"
-        assert len(advice.sources_used) == 5, (
-            f"Expected 5 source statuses (data_scientist, medical_kb, medical_llm, social, critique), "
-            f"got {len(advice.sources_used)}: {[s.source for s in advice.sources_used]}"
-        )
 
-        sources_by_name = {s.source: s for s in advice.sources_used}
-        assert "Baby Data Analysis" in sources_by_name
-        assert "Medical Knowledge Base" in sources_by_name
-        assert "Medical Expert LLM" in sources_by_name
-        assert "Social Cross-Check (Xiaohongshu)" in sources_by_name
-        assert "Quality Review" in sources_by_name
+        # Collect unique source names
+        source_names = {s.source for s in advice.sources_used}
+        assert "Baby Data Analysis" in source_names
+        assert "Medical Knowledge Base" in source_names
+        assert "Medical Expert LLM" in source_names
+        assert "Social Cross-Check (Xiaohongshu)" in source_names
+        assert "Quality Review" in source_names
 
-        # In mock mode, all should be OK
+        # Build lookup: first status per source (except Quality Review where we check all)
+        first_by_name: dict[str, SourceStatus] = {}
         for s in advice.sources_used:
-            assert s.status == SourceStatusCode.OK, (
-                f"{s.source} expected OK, got {s.status}: {s.message}"
-            )
+            if s.source not in first_by_name:
+                first_by_name[s.source] = s
+
+        # Data Scientist: FALLBACK (no DynamoDB tables)
+        assert first_by_name["Baby Data Analysis"].status == SourceStatusCode.FALLBACK
+        # Medical KB: FALLBACK (no KB configured)
+        assert first_by_name["Medical Knowledge Base"].status == SourceStatusCode.FALLBACK
+        # Medical LLM: OK (patched)
+        assert first_by_name["Medical Expert LLM"].status == SourceStatusCode.OK
+        # Social: SKIPPED (no MCP URL)
+        assert first_by_name["Social Cross-Check (Xiaohongshu)"].status == SourceStatusCode.SKIPPED
+        # Critique: FALLBACK (LLM patched to fail -> rule-based fallback)
+        assert first_by_name["Quality Review"].status == SourceStatusCode.FALLBACK

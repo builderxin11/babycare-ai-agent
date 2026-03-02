@@ -53,13 +53,13 @@ def _compute_three_source_confidence(
     KB + LLM interaction:
       KB found (kb_available=True)  + LLM present  -> +0.20
       KB missing (kb_available=False) + LLM present -> -0.05  (small; KB is small corpus)
-      KB stub (kb_available=None)                   -> +0.20  (simulated success)
+      KB unknown (kb_available=None)                  -> +0.20  (assume available)
     LLM + Social interaction:
       agrees_with_medical=True   -> +0.10
       agrees_with_medical=False  -> -0.15  (contradiction)
       agrees_with_medical=None   -> +0.00  (unknown)
     Three-way bonus:
-      KB found/stub + LLM + Social agree -> +0.10  (stacks)
+      KB found/unknown + LLM + Social agree -> +0.10  (stacks)
     Legacy bonuses:
       No issues       -> +0.05
       3+ citations    -> +0.03
@@ -73,7 +73,7 @@ def _compute_three_source_confidence(
     if kb_available is True:
         score += 0.20
     elif kb_available is None:
-        score += 0.20  # stub — simulated success
+        score += 0.20  # kb_available=None — assume available
     else:
         score -= 0.05  # kb_available=False — KB miss
 
@@ -146,7 +146,7 @@ def _format_critique_prompt(state: AgentState) -> str:
 
 def _call_critique_llm(state: AgentState) -> CritiqueResult:
     """Invoke Claude Opus via Bedrock to produce a structured CritiqueResult."""
-    from langchain_aws import ChatBedrockConverse  # lazy import — mock mode never hits AWS
+    from langchain_aws import ChatBedrockConverse  # lazy import
     from langchain_core.messages import HumanMessage, SystemMessage
 
     llm = ChatBedrockConverse(
@@ -313,13 +313,9 @@ def _run_llm(state: AgentState, iteration: int) -> dict:
 def critique_node(state: AgentState) -> dict:
     """Two-tier critique of accumulated agent outputs.
 
-    When use_mock_data=True (default): deterministic rule-based checks.
-    When use_mock_data=False: Claude Opus LLM judge with rule-based fallback.
+    Always attempts Claude Opus LLM judge with rule-based fallback on failure.
     """
     iteration = (state.get("critique_count") or 0) + 1
-
-    if config.use_mock_data:
-        return _run_rule_based(state, iteration)
     return _run_llm(state, iteration)
 
 

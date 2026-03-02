@@ -63,7 +63,7 @@ def _make_medical(**overrides) -> MedicalInsight:
         "citations": [
             Citation(source_type="book", reference="AAP Immunization Guide, p.42"),
         ],
-        "kb_available": None,  # stub default — simulated success
+        "kb_available": None,
     }
     defaults.update(overrides)
     return MedicalInsight(**defaults)
@@ -253,30 +253,11 @@ class TestCritiqueFallback:
 
 
 class TestCritiqueNodeRouting:
-    """Tests that critique_node routes correctly based on use_mock_data."""
+    """Tests that critique_node always attempts LLM with rule-based fallback."""
 
-    def test_mock_mode_uses_rule_based(self, monkeypatch):
-        """Default mock mode should use rule-based path."""
+    def test_attempts_llm(self, monkeypatch):
+        """critique_node should always attempt LLM path."""
         import agent.agents.moderator as mod
-        from agent.config import AgentConfig
-
-        mock_config = AgentConfig(use_mock_data=True)
-        monkeypatch.setattr(mod, "config", mock_config)
-
-        result = critique_node(_make_state())
-        cr = result["critique_result"]
-        assert isinstance(cr, CritiqueResult)
-        # Rule-based message format (no /llm suffix)
-        assert "[critique]" in result["messages"][0].content
-        assert "/llm" not in result["messages"][0].content
-
-    def test_live_mode_attempts_llm(self, monkeypatch):
-        """With use_mock_data=False, should attempt LLM path."""
-        import agent.agents.moderator as mod
-        from agent.config import AgentConfig
-
-        mock_config = AgentConfig(use_mock_data=False)
-        monkeypatch.setattr(mod, "config", mock_config)
 
         llm_result = CritiqueResult(
             approved=True,
@@ -289,6 +270,17 @@ class TestCritiqueNodeRouting:
             result = critique_node(_make_state())
 
         assert "[critique/llm]" in result["messages"][0].content
+
+    def test_falls_back_to_rule_based_on_llm_failure(self):
+        """When LLM fails, critique_node should fall back to rule-based."""
+        with patch("agent.agents.moderator._call_critique_llm", side_effect=RuntimeError("down")):
+            result = critique_node(_make_state())
+
+        cr = result["critique_result"]
+        assert isinstance(cr, CritiqueResult)
+        # Rule-based with all outputs should approve
+        assert cr.approved is True
+        assert "[critique]" in result["messages"][0].content
 
 
 # ---------------------------------------------------------------------------
@@ -310,8 +302,8 @@ class TestThreeSourceConfidence:
         # 0.50 + 0.20 + 0.10 + 0.10 + 0.05 + 0.03 + 0.02 = 1.00 -> capped at 0.95
         assert score == 0.95
 
-    def test_kb_stub_and_agree_highest(self):
-        """Stub mode (kb_available=None) with agreement should also hit max."""
+    def test_kb_unknown_and_agree_highest(self):
+        """kb_available=None with agreement should also hit max."""
         medical = _make_medical(kb_available=None)
         social = _make_social(agrees_with_medical=True)
         score = _compute_three_source_confidence(

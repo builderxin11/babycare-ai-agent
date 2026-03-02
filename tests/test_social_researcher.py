@@ -14,12 +14,12 @@ from agent.agents.social_researcher import (
     _format_notes_as_context,
     _mcp_call,
     _run_skip,
-    _run_stub,
     social_researcher_node,
 )
 from agent.models.outputs import (
     Citation,
     SocialInsight,
+    SourceStatusCode,
     TrendAnalysis,
     TrendAnomaly,
 )
@@ -92,12 +92,12 @@ def _make_notes() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# TestSocialResearcherStub
+# TestSocialResearcherSkip
 # ---------------------------------------------------------------------------
 
 
-class TestSocialResearcherStub:
-    """Tests for the stub (mock data) execution path."""
+class TestSocialResearcherSkip:
+    """Tests for the skip (no MCP configured) execution path."""
 
     def test_produces_social_insight(self):
         """Node should produce a SocialInsight in its return dict."""
@@ -105,21 +105,19 @@ class TestSocialResearcherStub:
         assert "social_insight" in result
         assert isinstance(result["social_insight"], SocialInsight)
 
-    def test_vaccine_topic_detected(self):
-        """When trend has vaccine correlation, stub should return vaccine-specific consensus."""
-        trend = _make_trend(correlations=["DTaP Vaccine (2025-01-14)"])
-        result = social_researcher_node(_make_state(trend_analysis=trend))
+    def test_no_mcp_returns_skip_message(self):
+        """Without MCP URL, node should return skip message."""
+        result = social_researcher_node(_make_state())
         insight = result["social_insight"]
-        assert "vaccine" in insight.summary.lower() or "dtap" in insight.summary.lower()
-        assert insight.sample_size == 523
+        assert insight.summary == _SKIP_SUMMARY
+        assert insight.sample_size == 0
 
-    def test_no_vaccine_topic(self):
-        """Without vaccine correlation, stub should return generic feeding consensus."""
-        trend = _make_trend(correlations=["Growth spurt phase"])
-        result = social_researcher_node(_make_state(trend_analysis=trend))
-        insight = result["social_insight"]
-        assert "feeding" in insight.summary.lower()
-        assert insight.sample_size == 150
+    def test_no_mcp_returns_skipped_status(self):
+        """Without MCP URL, should return SKIPPED status."""
+        result = social_researcher_node(_make_state())
+        statuses = result["source_statuses"]
+        assert len(statuses) == 1
+        assert statuses[0].status == SourceStatusCode.SKIPPED
 
     def test_marks_agent_completed(self):
         """Node should add 'social_researcher' to agents_completed."""
@@ -308,7 +306,7 @@ class TestMCPCall:
 
 
 # ---------------------------------------------------------------------------
-# TestSocialResearcherFallback
+# TestRunSkip
 # ---------------------------------------------------------------------------
 
 
@@ -327,6 +325,11 @@ class TestRunSkip:
         assert insight.sample_size == 0
 
 
+# ---------------------------------------------------------------------------
+# TestSocialResearcherFallback
+# ---------------------------------------------------------------------------
+
+
 class TestSocialResearcherFallback:
     """Test fallback behaviour for MCP failures and no-MCP configs."""
 
@@ -335,7 +338,7 @@ class TestSocialResearcherFallback:
         import agent.agents.social_researcher as mod
         from agent.config import AgentConfig
 
-        mock_config = AgentConfig(use_mock_data=False, xhs_mcp_url="")
+        mock_config = AgentConfig(xhs_mcp_url="")
         monkeypatch.setattr(mod, "config", mock_config)
 
         result = social_researcher_node(_make_state())
@@ -348,7 +351,6 @@ class TestSocialResearcherFallback:
         from agent.config import AgentConfig
 
         mock_config = AgentConfig(
-            use_mock_data=False,
             xhs_mcp_url="http://localhost:18060/mcp",
         )
         monkeypatch.setattr(mod, "config", mock_config)
@@ -367,7 +369,6 @@ class TestSocialResearcherFallback:
         from agent.config import AgentConfig
 
         mock_config = AgentConfig(
-            use_mock_data=False,
             xhs_mcp_url="http://localhost:18060/mcp",
         )
         monkeypatch.setattr(mod, "config", mock_config)
