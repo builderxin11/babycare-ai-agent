@@ -1,26 +1,40 @@
-"""Data Scientist agent — FUNCTIONAL.
+"""Data Scientist agent — two-tier execution.
 
 Performs pure-Python statistical analysis on PhysiologyLog data:
 - Daily aggregation of feeding volume, sleep duration, diaper count
 - Mean-deviation anomaly detection (>25% threshold)
 - Correlation with ContextEvents (e.g., vaccines)
+
+Execution tiers:
+  1. DynamoDB tables configured -> _run_dynamodb()   (SourceStatus OK)
+     any DynamoDB error         -> fallback _run_fallback() (SourceStatus FALLBACK)
+  2. No tables configured       -> _run_fallback()   (SourceStatus FALLBACK)
 """
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from datetime import date
 
 from langchain_core.messages import AIMessage
 
+from agent.config import config
 from agent.models.domain import ContextEvent, PhysiologyLog
 from agent.models.enums import PhysiologyLogType
 from agent.models.outputs import Citation, SourceStatus, SourceStatusCode, TrendAnalysis, TrendAnomaly
 from agent.models.state import AgentState
-from agent.tools.mock_data import MOCK_CONTEXT_EVENTS, generate_mock_physiology_logs
+from agent.tools.dynamodb import DynamoDBQueryError, query_context_events, query_physiology_logs
+
+logger = logging.getLogger(__name__)
 
 # Anomaly detection threshold: flag if >25% deviation from mean
 ANOMALY_THRESHOLD = 0.25
+
+
+# ---------------------------------------------------------------------------
+# Pure analysis helpers (shared by all tiers)
+# ---------------------------------------------------------------------------
 
 
 def _aggregate_daily(logs: list[PhysiologyLog]) -> dict[str, dict[str, float]]:
@@ -131,31 +145,29 @@ def _correlate_events(
     return correlations
 
 
-def data_scientist_node(state: AgentState) -> dict:
-    """Analyze physiology logs and detect anomalies.
+# ---------------------------------------------------------------------------
+# Shared analysis pipeline
+# ---------------------------------------------------------------------------
 
-    TODO: Replace mock data with DynamoDB queries via Amplify API.
-    TODO: Replace pure-Python stats with LLM-assisted interpretation.
+
+def _analyze(
+    logs: list[PhysiologyLog],
+    events: list[ContextEvent],
+    baby_name: str,
+) -> tuple[TrendAnalysis, int]:
+    """Run aggregation -> anomaly detection -> correlation -> build TrendAnalysis.
+
+    Returns (TrendAnalysis, num_records) so callers can build SourceStatus messages.
     """
-    # Use mock data for now
-    logs = generate_mock_physiology_logs()
-    events = MOCK_CONTEXT_EVENTS
-
-    # Step 1: Aggregate daily
     daily = _aggregate_daily(logs)
-
-    # Step 2: Detect anomalies
     anomalies = _detect_anomalies(daily)
-
-    # Step 3: Correlate with context events
     correlations = _correlate_events(anomalies, events)
 
-    # Build output
     num_days = len(daily)
     num_anomalies = len(anomalies)
 
     summary = (
-        f"Analyzed {num_days} days of physiology data for {state.get('baby_name', 'baby')}. "
+        f"Analyzed {num_days} days of physiology data for {baby_name}. "
         f"Detected {num_anomalies} anomalies across feeding, sleep, and diaper metrics."
     )
     if correlations:
@@ -171,16 +183,100 @@ def data_scientist_node(state: AgentState) -> dict:
         )],
     )
 
+    return trend, len(logs)
+
+
+# ---------------------------------------------------------------------------
+# Execution tiers
+# ---------------------------------------------------------------------------
+
+
+def _run_fallback(state: AgentState) -> tuple[TrendAnalysis, int]:
+    """Return an empty analysis when no real data is available.
+
+    Used when DynamoDB tables are not configured or when a query fails.
+    """
+    baby_name = state.get("baby_name", "baby")
+    return _analyze([], [], baby_name)
+
+
+def _run_dynamodb(state: AgentState) -> tuple[TrendAnalysis, int]:
+    """Query DynamoDB for real data and run analysis pipeline.
+
+    Raises DynamoDBQueryError on any failure so the caller can fall back.
+    """
+    baby_id = state.get("baby_id", "")
+    baby_name = state.get("baby_name", "baby")
+
+    logs = query_physiology_logs(
+        table_name=config.physiology_log_table,
+        baby_id=baby_id,
+        lookback_days=config.data_lookback_days,
+        region=config.aws_region,
+    )
+    events = query_context_events(
+        table_name=config.context_event_table,
+        baby_id=baby_id,
+        lookback_days=config.data_lookback_days,
+        region=config.aws_region,
+    )
+
+    return _analyze(logs, events, baby_name)
+
+
+# ---------------------------------------------------------------------------
+# Graph node entry point
+# ---------------------------------------------------------------------------
+
+
+def data_scientist_node(state: AgentState) -> dict:
+    """Analyze physiology logs and detect anomalies.
+
+    Routes to DynamoDB or fallback depending on configuration.
+    DynamoDB errors fall back to empty analysis with FALLBACK status.
+    """
+    if config.physiology_log_table and config.context_event_table:
+        try:
+            trend, num_records = _run_dynamodb(state)
+            source_status = SourceStatus(
+                source="Baby Data Analysis",
+                status=SourceStatusCode.OK,
+                message=f"Analyzed {len(trend.anomalies)} anomalies from {num_records} records (DynamoDB).",
+            )
+        except DynamoDBQueryError:
+            logger.warning(
+                "DynamoDB query failed; no baby data available.",
+                exc_info=True,
+            )
+            trend, num_records = _run_fallback(state)
+            source_status = SourceStatus(
+                source="Baby Data Analysis",
+                status=SourceStatusCode.FALLBACK,
+                message=(
+                    "DynamoDB query failed. No baby data available; "
+                    "trend analysis is empty."
+                ),
+            )
+    else:
+        logger.info(
+            "DynamoDB table names not configured; no baby data available.",
+        )
+        trend, num_records = _run_fallback(state)
+        source_status = SourceStatus(
+            source="Baby Data Analysis",
+            status=SourceStatusCode.FALLBACK,
+            message=(
+                "No DynamoDB tables configured. No baby data available; "
+                "trend analysis is empty."
+            ),
+        )
+
     return {
         "trend_analysis": trend,
         "agents_completed": ["data_scientist"],
-        "source_statuses": [SourceStatus(
-            source="Baby Data Analysis",
-            status=SourceStatusCode.OK,
-            message=f"Analyzed {num_days} days of physiology data ({len(logs)} records).",
-        )],
+        "source_statuses": [source_status],
         "messages": [AIMessage(
-            content=f"[data_scientist] {summary}",
+            content=f"[data_scientist] {trend.summary}",
             name="data_scientist",
         )],
     }
