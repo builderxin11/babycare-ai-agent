@@ -2,6 +2,9 @@ node_modules/
 amplify_outputs.json
 .amplify/
 
+# Secrets
+.env
+
 # Python
 venv/
 __pycache__/

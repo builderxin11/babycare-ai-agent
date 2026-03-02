@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
 
 @dataclass(frozen=True)
 class AgentConfig:
@@ -36,7 +38,12 @@ class AgentConfig:
 
     @classmethod
     def from_env(cls) -> AgentConfig:
-        """Build config from environment variables with sensible defaults."""
+        """Build config from environment variables with sensible defaults.
+
+        Loads .env file (if present) before reading os.environ.
+        Existing environment variables take precedence over .env values.
+        """
+        load_dotenv()
         return cls(
             aws_region=os.getenv("AWS_REGION", "us-west-2"),
             sonnet_model_id=os.getenv(
