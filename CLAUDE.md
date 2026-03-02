@@ -54,6 +54,13 @@ Automated daily analysis that runs at end-of-day on the baby's logged data and g
 - Must work even without a parent question — the agents need to self-generate the "question" from the data.
 - Store reports in a new `DailyReport` DynamoDB table linked to Baby, so parents can review history.
 
+### Agent Parallelization (P2)
+Investigate running independent agent nodes in parallel to reduce end-to-end latency. Current graph runs agents sequentially via the supervisor loop (`data_scientist → medical_expert → social_researcher`). Potential parallel groups:
+- **Data Scientist** has no agent dependencies — always runs first.
+- **Medical Expert** and **Social Researcher** both depend on Data Scientist output but are independent of each other — could run in parallel after Data Scientist completes.
+- Requires changing the supervisor routing logic or using LangGraph's `Send()` / fan-out pattern.
+- Must preserve the constraint: Medical Expert output feeds into Social Researcher's prompt (for `agrees_with_medical` assessment). Evaluate whether this dependency is strict or can be relaxed.
+
 ## 8. Instructions for Claude Code
 - **Always** create a Spec in `.q/specs/` before implementing new Agent logic.
 - **Never** simplify the Multi-Agent logic for the sake of speed.
