@@ -38,24 +38,61 @@ class MCPError(Exception):
 # ---------------------------------------------------------------------------
 
 
+def _extract_chinese_text(text: str) -> str:
+    """Extract Chinese characters and common punctuation from mixed text."""
+    import re
+    # Match Chinese characters, numbers, and common Chinese punctuation
+    chinese_pattern = re.compile(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef0-9]+')
+    matches = chinese_pattern.findall(text)
+    return " ".join(matches)
+
+
 def _build_search_query(state: AgentState) -> str:
-    """Combine question + Chinese age format + top-2 correlations into a search query."""
+    """Build an optimized XHS search query.
+
+    Strategy:
+    1. Extract Chinese text from question (XHS is Chinese-language)
+    2. Add baby age in Chinese format
+    3. Include medical symptoms/conditions if available
+    4. Add top correlations from trend analysis
+    5. Keep query focused (max ~100 chars)
+    """
     parts: list[str] = []
 
+    # Extract Chinese keywords from question
     question = state.get("question", "")
     if question:
-        parts.append(question)
+        chinese_q = _extract_chinese_text(question)
+        if chinese_q:
+            parts.append(chinese_q)
+        elif len(question) < 50:
+            # Short English question - use as-is
+            parts.append(question)
 
+    # Add age context in Chinese
     age = state.get("baby_age_months")
     if age is not None:
         parts.append(f"{age}个月宝宝")
 
+    # Extract key terms from medical insight if available
+    medical = state.get("medical_insight")
+    if medical and medical.summary:
+        medical_chinese = _extract_chinese_text(medical.summary)
+        if medical_chinese and len(medical_chinese) < 30:
+            parts.append(medical_chinese)
+
+    # Add top correlations from trend analysis
     trend = state.get("trend_analysis")
     if trend and trend.correlations:
         for corr in trend.correlations[:2]:
             parts.append(corr)
 
-    return " ".join(parts)
+    # Join and truncate to reasonable length for search
+    query = " ".join(parts)
+    if len(query) > 100:
+        query = query[:100].rsplit(" ", 1)[0]
+
+    return query
 
 
 # Module-level MCP session state (lazy-initialized)
@@ -157,14 +194,21 @@ def _mcp_call(method: str, params: dict[str, Any]) -> Any:
     return result
 
 
-def _fetch_xhs_notes(query: str, max_notes: int = 3) -> tuple[list[dict[str, Any]], int]:
+def _fetch_xhs_notes(query: str, max_notes: int | None = None) -> tuple[list[dict[str, Any]], int]:
     """Search XHS notes and fetch details for the top ones by engagement.
 
     Per-note get_note_detail errors are caught individually so one bad note
     doesn't break the entire search.
 
+    Args:
+        query: Search keyword
+        max_notes: Max notes to fetch (default: config.xhs_max_posts)
+
     Returns (notes, failed_detail_count).
     """
+    if max_notes is None:
+        max_notes = config.xhs_max_posts
+
     search_result = _mcp_call("search_feeds", {"keyword": query})
 
     # search_feeds returns {"feeds": [...], "count": N}

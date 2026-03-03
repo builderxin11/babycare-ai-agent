@@ -383,14 +383,14 @@ def _synthesize_normal(state: AgentState) -> ParentingAdvice:
     if social:
         all_citations.extend(social.citations)
 
-    # Build key points from each agent
+    # Build key points from each agent (with source attribution)
     key_points: list[str] = []
     if trend:
-        key_points.append(trend.summary)
+        key_points.append(f"[Data] {trend.summary}")
     if medical:
-        key_points.append(medical.summary)
+        key_points.append(f"[Medical] {medical.summary}")
     if social:
-        key_points.append(social.summary)
+        key_points.append(f"[Social] {social.summary}")
 
     # Add contradiction note when social disagrees with medical
     if social and social.agrees_with_medical is False:
@@ -460,14 +460,14 @@ def _synthesize_degraded(state: AgentState) -> ParentingAdvice:
     if trend:
         raw_sources.append(f"[Data Analysis] {trend.summary}")
 
-    # Minimal key points
+    # Minimal key points (with source attribution)
     key_points: list[str] = []
     if trend:
-        key_points.append(trend.summary)
+        key_points.append(f"[Data] {trend.summary}")
     if medical:
-        key_points.append(medical.summary)
+        key_points.append(f"[Medical] {medical.summary}")
     if social:
-        key_points.append(social.summary)
+        key_points.append(f"[Social] {social.summary}")
 
     return ParentingAdvice(
         question=question,
