@@ -12,14 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent.graph.builder import compile_graph
-from agent.models.outputs import ParentingAdvice
+from agent.models.outputs import DailyReport, ParentingAdvice
+from agent.report.generator import generate_daily_report
 
 app = FastAPI(title="NurtureMind Agent API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -44,6 +45,34 @@ class AskResponse(BaseModel):
     sources_used: list[dict]
     is_degraded: bool
     raw_sources: list[str]
+    disclaimer: str
+
+
+class ReportRequest(BaseModel):
+    """Request body for daily report generation."""
+
+    baby_id: str = Field(min_length=1)
+    baby_name: str = Field(min_length=1)
+    baby_age_months: int = Field(ge=0)
+
+
+class ReportResponse(BaseModel):
+    """Mirrors DailyReport for JSON serialization."""
+
+    baby_id: str
+    baby_name: str
+    report_date: str
+    health_status: str
+    confidence_score: float
+    trend_direction: str
+    summary: str
+    observations: list[str]
+    action_items: list[str]
+    warnings: list[str]
+    citations: list[dict]
+    data_snapshot: dict
+    baseline_snapshot: dict
+    generated_at: str
     disclaimer: str
 
 
@@ -128,6 +157,44 @@ async def ask_agent(req: AskRequest) -> AskResponse:
         _graph.checkpointer.delete_thread(thread_id)
 
     return response
+
+
+@app.post("/report", response_model=ReportResponse)
+async def generate_report(req: ReportRequest) -> ReportResponse:
+    """Generate a daily health report for a baby.
+
+    This runs a lightweight agent pipeline (Data Scientist → Medical Expert → Critique)
+    without Social Researcher or HITL interrupts for faster execution.
+    """
+    try:
+        report: DailyReport = generate_daily_report(
+            baby_id=req.baby_id,
+            baby_name=req.baby_name,
+            baby_age_months=req.baby_age_months,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Report generation failed: {e}",
+        ) from e
+
+    return ReportResponse(
+        baby_id=report.baby_id,
+        baby_name=report.baby_name,
+        report_date=report.report_date.isoformat(),
+        health_status=report.health_status.value,
+        confidence_score=report.confidence_score,
+        trend_direction=report.trend_direction.value,
+        summary=report.summary,
+        observations=report.observations,
+        action_items=report.action_items,
+        warnings=report.warnings,
+        citations=[c.model_dump() for c in report.citations],
+        data_snapshot=report.data_snapshot,
+        baseline_snapshot=report.baseline_snapshot,
+        generated_at=report.generated_at.isoformat(),
+        disclaimer=report.disclaimer,
+    )
 
 
 @app.get("/health")

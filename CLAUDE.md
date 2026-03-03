@@ -61,6 +61,24 @@ Investigate running independent agent nodes in parallel to reduce end-to-end lat
 - Requires changing the supervisor routing logic or using LangGraph's `Send()` / fan-out pattern.
 - Must preserve the constraint: Medical Expert output feeds into Social Researcher's prompt (for `agrees_with_medical` assessment). Evaluate whether this dependency is strict or can be relaxed.
 
+### UX Optimizations (P3)
+
+1. **Xiaohongshu Search Query Optimization**
+   - Current search queries are too literal, results not always relevant
+   - Investigate: keyword extraction, Chinese synonym expansion, age-specific terms
+   - Consider: pre-filtering by engagement threshold before fetching details
+
+2. **Increase XHS Post Coverage**
+   - Currently fetches top 3 posts by engagement
+   - Increase to 5-8 posts for better consensus representation
+   - Balance: more posts = slower response, diminishing returns
+
+3. **Source Attribution in Key Points**
+   - Parents can't tell which conclusions come from which source
+   - Tag each key point with source: `[Medical]`, `[Data]`, `[Social]`
+   - Example: "[Medical] Post-vaccine appetite decrease is normal for 48-72 hours"
+   - Implementation: modify `synthesize_node` to preserve source tags through to `ParentingAdvice.key_points`
+
 ## 8. Instructions for Claude Code
 - **Always** create a Spec in `.q/specs/` before implementing new Agent logic.
 - **Never** simplify the Multi-Agent logic for the sake of speed.

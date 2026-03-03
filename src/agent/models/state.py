@@ -12,6 +12,7 @@ from langgraph.graph import add_messages
 
 from .outputs import (
     CritiqueResult,
+    DailyReport,
     ParentingAdvice,
     SourceStatus,
     TrendAnalysis,
@@ -53,8 +54,12 @@ class AgentState(TypedDict, total=False):
 
     # --- Final output ---
     final_advice: ParentingAdvice | None
+    daily_report: DailyReport | None
 
     # --- Human-in-the-loop ---
     requires_human_review: bool
     human_review_reason: str
     human_feedback: str | None
+
+    # --- Report mode flag ---
+    is_daily_report: bool

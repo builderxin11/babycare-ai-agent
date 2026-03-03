@@ -223,6 +223,7 @@ PYTHONPATH=src uvicorn api.server:app --port 8000 --reload
 
 The API exposes:
 - `POST /ask` — Send a parenting question, receive `ParentingAdvice` JSON
+- `POST /report` — Generate a daily health report for a baby (no question needed)
 - `GET /health` — Health check
 
 ### Xiaohongshu MCP Setup (Optional)
