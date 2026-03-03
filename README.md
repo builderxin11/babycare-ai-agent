@@ -201,36 +201,61 @@ cp .env.example .env
 ### Run Tests
 
 ```bash
-# Unit tests (103 tests, no AWS calls)
-pytest tests/ -v
+# Unit tests (mocked AWS calls)
+PYTHONPATH=src pytest tests/ -v
 
-# Eval framework (19 tests, includes mock-mode end-to-end)
-pytest src/eval/ -v
+# Eval framework (end-to-end with fallback data)
+PYTHONPATH=src pytest src/eval/ -v
 
-# Full live eval against Bedrock (requires AWS credentials)
-USE_MOCK_DATA=false BEDROCK_KB_ID=<your-kb-id> python src/eval/judge.py
+# Full live eval against Bedrock (requires AWS credentials + configured tables)
+PYTHONPATH=src python src/eval/judge.py
 
 # LLM-based judge (Claude Opus scores the output)
-EVAL_JUDGE_MODE=llm_based USE_MOCK_DATA=false BEDROCK_KB_ID=<your-kb-id> python src/eval/judge.py
+EVAL_JUDGE_MODE=llm_based PYTHONPATH=src python src/eval/judge.py
 ```
 
-### Run the Agent
+### Run the API Server
 
 ```bash
-# Mock mode (no AWS calls)
-python src/agent/main.py
-
-# Live mode with Bedrock RAG
-USE_MOCK_DATA=false BEDROCK_KB_ID=<your-kb-id> python src/agent/main.py
+# Start FastAPI server
+PYTHONPATH=src uvicorn api.server:app --port 8000 --reload
 ```
+
+The API exposes:
+- `POST /ask` — Send a parenting question, receive `ParentingAdvice` JSON
+- `GET /health` — Health check
+
+### Xiaohongshu MCP Setup (Optional)
+
+The Social Researcher agent can cross-check medical advice against Chinese parenting community consensus via the [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) server.
+
+```bash
+# 1. Download binaries (macOS Apple Silicon)
+mkdir -p tools && cd tools
+curl -L -o xhs.tar.gz "https://github.com/xpzouying/xiaohongshu-mcp/releases/latest/download/xiaohongshu-mcp-darwin-arm64.tar.gz"
+tar -xzf xhs.tar.gz && rm xhs.tar.gz
+chmod +x xiaohongshu-*
+
+# 2. Login to Xiaohongshu (first time only, opens browser for QR scan)
+./xiaohongshu-login-darwin-arm64
+
+# 3. Start MCP server (keep running in background)
+./xiaohongshu-mcp-darwin-arm64
+# Server listens on http://localhost:18060/mcp
+
+# 4. Configure environment variable
+echo "XHS_MCP_URL=http://localhost:18060/mcp" >> .env
+```
+
+Without `XHS_MCP_URL` configured, the Social Researcher gracefully skips and reports "not cross-checked" in the response.
 
 ### Amplify Backend
 
 ```bash
-# Start local sandbox
+# Start local sandbox (also refreshes AWS credentials)
 npx ampx sandbox
 
-# Deploy
+# Deploy to AWS
 npx ampx pipeline-deploy
 ```
 
@@ -242,12 +267,40 @@ npx ampx pipeline-deploy
 | `SONNET_MODEL_ID` | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Sub-agent LLM |
 | `OPUS_MODEL_ID` | `us.anthropic.claude-opus-4-6-v1` | Moderator/Judge LLM |
 | `BEDROCK_KB_ID` | *(empty)* | Bedrock Knowledge Base ID for medical RAG |
-| `XHS_MCP_URL` | *(empty)* | Xiaohongshu MCP server endpoint |
-| `USE_MOCK_DATA` | `true` | Use stubs instead of live AWS calls |
+| `XHS_MCP_URL` | *(empty)* | Xiaohongshu MCP server endpoint (e.g., `http://localhost:18060/mcp`) |
+| `PHYSIOLOGY_LOG_TABLE` | *(empty)* | DynamoDB table name for PhysiologyLog (from Amplify outputs) |
+| `CONTEXT_EVENT_TABLE` | *(empty)* | DynamoDB table name for ContextEvent (from Amplify outputs) |
+| `DATA_LOOKBACK_DAYS` | `7` | Days of historical data to analyze |
 | `USE_DYNAMODB_CHECKPOINTER` | `false` | Enable DynamoDB-backed graph persistence |
 | `EVAL_JUDGE_MODE` | `rule_based` | `rule_based` or `llm_based` judge for eval |
 | `CONFIDENCE_THRESHOLD` | `0.8` | Below this → HITL interrupt |
 | `MAX_CRITIQUE_ITERATIONS` | `2` | Max reflection loop iterations |
+
+## Deployment Notes
+
+### DynamoDB Table Names
+
+Amplify Gen 2 generates dynamic table names (e.g., `PhysiologyLog-abc123-NONE`). After running `npx ampx sandbox`, find your table names in `amplify_outputs.json` or AWS Console, then set:
+
+```bash
+PHYSIOLOGY_LOG_TABLE=PhysiologyLog-xxxxxxx-NONE
+CONTEXT_EVENT_TABLE=ContextEvent-xxxxxxx-NONE
+```
+
+### Long-Running Deployment
+
+The API server is designed for long-running deployment:
+- **Memory management**: MemorySaver checkpoint data is cleaned up after each request to prevent unbounded memory growth
+- **Stateless requests**: Each `/ask` request is independent; no cross-request state is maintained
+- **AWS credentials**: Use IAM roles (EC2 instance profile, ECS task role, Lambda execution role) for auto-refreshing credentials in production
+
+### Production Checklist
+
+- [ ] Set `BEDROCK_KB_ID` with your Knowledge Base containing medical literature
+- [ ] Set `PHYSIOLOGY_LOG_TABLE` and `CONTEXT_EVENT_TABLE` from Amplify outputs
+- [ ] (Optional) Set `XHS_MCP_URL` if deploying the Xiaohongshu MCP server
+- [ ] (Optional) Set `USE_DYNAMODB_CHECKPOINTER=true` for async HITL workflows
+- [ ] Configure CORS in `src/api/server.py` for your frontend domain
 
 ## License
 
