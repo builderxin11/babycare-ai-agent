@@ -58,28 +58,103 @@ def _build_search_query(state: AgentState) -> str:
     return " ".join(parts)
 
 
+# Module-level MCP session state (lazy-initialized)
+_mcp_session: Any = None  # requests.Session
+_mcp_session_id: str | None = None
+_mcp_request_id: int = 0
+
+
+def _get_mcp_session() -> tuple[Any, str]:
+    """Get or create an initialized MCP session.
+
+    Returns (requests.Session, session_id). Initializes the MCP protocol
+    handshake on first call.
+    """
+    global _mcp_session, _mcp_session_id, _mcp_request_id
+    import requests
+
+    if _mcp_session is not None and _mcp_session_id is not None:
+        return _mcp_session, _mcp_session_id
+
+    _mcp_session = requests.Session()
+    _mcp_request_id = 0
+
+    # Step 1: Initialize
+    _mcp_request_id += 1
+    init_resp = _mcp_session.post(
+        config.xhs_mcp_url,
+        json={
+            "jsonrpc": "2.0",
+            "id": _mcp_request_id,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "nurturemind", "version": "1.0"},
+            },
+        },
+        timeout=15,
+    )
+    init_resp.raise_for_status()
+    _mcp_session_id = init_resp.headers.get("Mcp-Session-Id")
+    if not _mcp_session_id:
+        raise MCPError("MCP server did not return session ID")
+
+    # Step 2: Send initialized notification
+    _mcp_session.post(
+        config.xhs_mcp_url,
+        headers={"Mcp-Session-Id": _mcp_session_id},
+        json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+        timeout=15,
+    )
+
+    return _mcp_session, _mcp_session_id
+
+
 def _mcp_call(method: str, params: dict[str, Any]) -> Any:
-    """Send a JSON-RPC request to the XHS MCP server.
+    """Send a JSON-RPC tools/call request to the XHS MCP server.
 
     Raises MCPError on JSON-RPC errors, requests exceptions on HTTP failures.
     Import of `requests` is lazy so unconfigured environments never need the dependency.
     """
-    import requests
+    global _mcp_request_id
+
+    session, session_id = _get_mcp_session()
+    _mcp_request_id += 1
 
     payload = {
         "jsonrpc": "2.0",
-        "id": 1,
-        "method": method,
-        "params": params,
+        "id": _mcp_request_id,
+        "method": "tools/call",
+        "params": {
+            "name": method,
+            "arguments": params,
+        },
     }
-    resp = requests.post(config.xhs_mcp_url, json=payload, timeout=15)
+    resp = session.post(
+        config.xhs_mcp_url,
+        headers={"Mcp-Session-Id": session_id},
+        json=payload,
+        timeout=30,
+    )
     resp.raise_for_status()
 
     body = resp.json()
     if "error" in body:
         raise MCPError(f"MCP error: {body['error']}")
 
-    return body.get("result", [])
+    # tools/call returns result with content array
+    result = body.get("result", {})
+    content = result.get("content", [])
+    if content and isinstance(content, list) and len(content) > 0:
+        first = content[0]
+        if first.get("type") == "text":
+            import json
+            try:
+                return json.loads(first.get("text", "{}"))
+            except json.JSONDecodeError:
+                return first.get("text", "")
+    return result
 
 
 def _fetch_xhs_notes(query: str, max_notes: int = 3) -> tuple[list[dict[str, Any]], int]:
@@ -90,36 +165,67 @@ def _fetch_xhs_notes(query: str, max_notes: int = 3) -> tuple[list[dict[str, Any
 
     Returns (notes, failed_detail_count).
     """
-    raw_notes = _mcp_call("search_notes", {"keyword": query})
+    search_result = _mcp_call("search_feeds", {"keyword": query})
 
-    if not raw_notes:
+    # search_feeds returns {"feeds": [...], "count": N}
+    if isinstance(search_result, dict):
+        raw_items = search_result.get("feeds", search_result.get("items", []))
+    elif isinstance(search_result, list):
+        raw_items = search_result
+    else:
+        raw_items = []
+
+    if not raw_items:
         return [], 0
+
+    # Flatten nested noteCard structure for easier processing
+    def _flatten_note(item: dict) -> dict:
+        """Extract nested noteCard fields to top level for uniform access."""
+        note_card = item.get("noteCard", {})
+        interact = note_card.get("interactInfo", {})
+        user = note_card.get("user", {})
+        return {
+            "id": item.get("id"),
+            "feed_id": item.get("id"),
+            "xsec_token": item.get("xsecToken", ""),
+            "title": note_card.get("displayTitle", note_card.get("title", "")),
+            "author": user.get("nickname", user.get("name", "Anonymous")),
+            "likes": int(interact.get("likedCount", 0) or 0),
+            "comments": int(interact.get("commentCount", 0) or 0),
+            "collects": int(interact.get("collectedCount", 0) or 0),
+            "content": note_card.get("desc", ""),  # May be empty in search results
+            "_raw": item,  # Keep raw data for detail fetch
+        }
+
+    flat_notes = [_flatten_note(item) for item in raw_items]
 
     # Sort by total engagement (likes + comments + collects)
     def _engagement(note: dict) -> int:
-        return (
-            note.get("likes", 0)
-            + note.get("comments", 0)
-            + note.get("collects", 0)
-        )
+        return note.get("likes", 0) + note.get("comments", 0) + note.get("collects", 0)
 
-    sorted_notes = sorted(raw_notes, key=_engagement, reverse=True)[:max_notes]
+    sorted_notes = sorted(flat_notes, key=_engagement, reverse=True)[:max_notes]
 
     detailed: list[dict[str, Any]] = []
     failed_count = 0
     for note in sorted_notes:
-        note_id = note.get("id") or note.get("note_id")
-        if not note_id:
+        feed_id = note.get("feed_id")
+        xsec_token = note.get("xsec_token", "")
+        if not feed_id or not xsec_token:
             detailed.append(note)
             continue
         try:
-            detail = _mcp_call("get_note_detail", {"note_id": note_id})
+            detail = _mcp_call("get_feed_detail", {"feed_id": feed_id, "xsec_token": xsec_token})
             if isinstance(detail, dict):
-                detailed.append(detail)
+                # Extract content from nested structure: detail["data"]["note"]["desc"]
+                data = detail.get("data", {})
+                note_data = data.get("note", {})
+                content = note_data.get("desc", detail.get("content", detail.get("desc", "")))
+                note["content"] = content
+                detailed.append(note)
             else:
                 detailed.append(note)
         except Exception:
-            logger.warning("Failed to fetch detail for note %s, using summary.", note_id)
+            logger.warning("Failed to fetch detail for feed %s, using summary.", feed_id)
             detailed.append(note)
             failed_count += 1
 
@@ -156,7 +262,7 @@ def _extract_citations_from_notes(notes: list[dict[str, Any]]) -> list[Citation]
     for note in notes:
         title = note.get("title", "Untitled XHS Post")
         author = note.get("author", note.get("user", {}).get("nickname", "Anonymous"))
-        note_id = note.get("id") or note.get("note_id", "")
+        note_id = note.get("id") or note.get("feed_id") or note.get("note_id", "")
         citations.append(
             Citation(
                 source_type="xhs_post",

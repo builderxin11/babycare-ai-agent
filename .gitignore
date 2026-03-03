@@ -1,6 +1,7 @@
 node_modules/
 amplify_outputs.json
 .amplify/
+.next/
 
 # Secrets
 .env
@@ -17,3 +18,6 @@ build/
 
 # Knowledge Base reference docs (uploaded to S3, not app code)
 kb-docs/
+
+# XHS MCP binaries
+tools/
