@@ -39,11 +39,14 @@ logger = logging.getLogger(__name__)
 # Allowed msgpack modules for checkpoint serialization
 _ALLOWED_MSGPACK_MODULES: set[tuple[str, str]] = {
     ("agent.models.outputs", "CritiqueResult"),
+    ("agent.models.outputs", "DailyReport"),
+    ("agent.models.outputs", "HealthStatus"),
     ("agent.models.outputs", "MedicalInsight"),
     ("agent.models.outputs", "RiskLevel"),
-    ("agent.models.outputs", "TrendAnalysis"),
     ("agent.models.outputs", "SourceStatus"),
     ("agent.models.outputs", "SourceStatusCode"),
+    ("agent.models.outputs", "TrendAnalysis"),
+    ("agent.models.outputs", "TrendDirection"),
 }
 
 
@@ -272,11 +275,11 @@ def generate_daily_report(
         graph.checkpointer.delete_thread(thread_id)
 
     # Extract the report
-    report = final_state.get("daily_report")
-    if not report:
+    report_data = final_state.get("daily_report")
+    if not report_data:
         # Fallback: create a minimal report
         logger.warning("Report writer did not produce a report, creating fallback")
-        report = DailyReport(
+        return DailyReport(
             baby_id=baby_id,
             baby_name=baby_name,
             report_date=report_date,
@@ -292,4 +295,25 @@ def generate_daily_report(
             baseline_snapshot={},
         )
 
-    return report
+    # Handle both dict (from checkpoint deserialization) and DailyReport object
+    if isinstance(report_data, DailyReport):
+        return report_data
+    elif isinstance(report_data, dict):
+        return DailyReport.model_validate(report_data)
+    else:
+        logger.warning(f"Unexpected report type: {type(report_data)}, creating fallback")
+        return DailyReport(
+            baby_id=baby_id,
+            baby_name=baby_name,
+            report_date=report_date,
+            health_status=HealthStatus.HEALTHY,
+            confidence_score=0.5,
+            trend_direction=TrendDirection.STABLE,
+            summary="Unable to process report data.",
+            observations=[],
+            action_items=[],
+            warnings=[],
+            citations=[],
+            data_snapshot={},
+            baseline_snapshot={},
+        )
