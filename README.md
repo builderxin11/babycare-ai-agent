@@ -178,11 +178,30 @@ amplify/
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.11+
 - Node.js 18+ (for Amplify)
 - AWS credentials with Bedrock access (`us-west-2`)
+- Docker (for EC2 deployment)
 
-### Setup
+### One-Command Setup (Recommended)
+
+```bash
+git clone https://github.com/builderxin11/babycare-ai-agent.git
+cd babycare-ai-agent
+./scripts/setup.sh
+```
+
+This interactive script will:
+1. Check and install dependencies
+2. Configure AWS credentials
+3. Set up Python virtual environment
+4. Create `.env` file
+5. Optionally deploy Amplify backend
+
+### Manual Setup
+
+<details>
+<summary>Click to expand manual setup steps</summary>
 
 ```bash
 # Clone
@@ -193,10 +212,15 @@ cd babycare-ai-agent
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 
+# Node.js dependencies
+npm install
+
 # Environment variables
 cp .env.example .env
 # Edit .env — at minimum set BEDROCK_KB_ID if you have a Knowledge Base
 ```
+
+</details>
 
 ### Run Tests
 
@@ -276,6 +300,71 @@ npx ampx pipeline-deploy
 | `EVAL_JUDGE_MODE` | `rule_based` | `rule_based` or `llm_based` judge for eval |
 | `CONFIDENCE_THRESHOLD` | `0.8` | Below this → HITL interrupt |
 | `MAX_CRITIQUE_ITERATIONS` | `2` | Max reflection loop iterations |
+
+## iOS App
+
+Two iOS apps are included:
+
+| App | Path | Features |
+|-----|------|----------|
+| **NurtureMind** | `ios/NurtureMind/` | Core app, mock data |
+| **CalmDownDad** | `ios/CalmDownDad/` | Full app with Cognito auth, REST API |
+
+### Build & Run
+
+```bash
+# Open in Xcode
+open ios/CalmDownDad/CalmDownDad.xcodeproj
+
+# Or for NurtureMind
+open ios/NurtureMind/NurtureMind.xcodeproj
+```
+
+### iOS Configuration
+
+Edit `ios/CalmDownDad/CalmDownDad/Services/Configuration.swift`:
+
+```swift
+struct Configuration {
+    // Development (localhost)
+    static let agentAPIBaseURL = URL(string: "http://localhost:8000")!
+
+    // Production (your EC2)
+    // static let agentAPIBaseURL = URL(string: "http://YOUR_EC2_IP:8000")!
+}
+```
+
+## EC2 Deployment
+
+For production deployment with Docker:
+
+```bash
+# On EC2 (Ubuntu 22.04, t3.medium+)
+git clone https://github.com/builderxin11/babycare-ai-agent.git /opt/nurturemind
+cd /opt/nurturemind
+
+# Run setup
+./deploy/scripts/setup-ec2.sh
+
+# Configure
+cd deploy
+cp .env.example .env
+nano .env  # Fill in your values
+
+# Deploy
+docker compose up -d --build
+```
+
+### Xiaohongshu Login (EC2)
+
+The XHS MCP requires periodic login (every 1-2 weeks):
+
+1. Open `http://YOUR_EC2_IP:6080` in browser
+2. Enter VNC password
+3. Login to xiaohongshu.com in Chrome
+4. Close browser - session saved
+
+See [deploy/DEPLOY.md](deploy/DEPLOY.md) for detailed deployment guide.
 
 ## Deployment Notes
 
