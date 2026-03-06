@@ -19,7 +19,10 @@ app = FastAPI(title="NurtureMind Agent API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",  # Web frontend
+        "*",  # Allow iOS simulator and other local clients (dev only)
+    ],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
