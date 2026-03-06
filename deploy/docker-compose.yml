@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # Main FastAPI application
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: nurturemind-api
+    ports:
+      - "8000:8000"
+    environment:
+      - AWS_REGION=${AWS_REGION:-us-west-2}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - BABY_TABLE=${BABY_TABLE}
+      - PHYSIOLOGY_LOG_TABLE=${PHYSIOLOGY_LOG_TABLE}
+      - CONTEXT_EVENT_TABLE=${CONTEXT_EVENT_TABLE}
+      - BEDROCK_KB_ID=${BEDROCK_KB_ID}
+      - XHS_MCP_URL=http://xhs-mcp:3000
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_REGION=${COGNITO_REGION:-us-west-2}
+    depends_on:
+      xhs-mcp:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - nurturemind-net
+
+  # Xiaohongshu MCP Server with VNC for login
+  # Based on ubuntu-desktop with Chrome and MCP pre-installed
+  xhs-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.xhs-mcp
+    container_name: xhs-mcp
+    ports:
+      - "3000:3000"   # MCP API
+      - "6080:80"     # Web VNC (access via browser to login)
+    environment:
+      - VNC_PASSWORD=${VNC_PASSWORD:-nurturemind123}
+      - RESOLUTION=1280x720
+    volumes:
+      # Persist browser session data
+      - xhs-data:/root
+    shm_size: '512m'
+    restart: unless-stopped
+    networks:
+      - nurturemind-net
+
+volumes:
+  xhs-data:
+
+networks:
+  nurturemind-net:
+    driver: bridge
