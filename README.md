@@ -1,4 +1,4 @@
-# NurtureMind — Multi-Agent Parenting Advisor
+# CalmDownDad — Multi-Agent Parenting Advisor
 
 A production-grade **Multi-Agent System (MAS)** that provides evidence-based parenting guidance by orchestrating four specialized AI agents through a LangGraph state machine. The system performs **Reasoning & Reflection** — not just RAG retrieval — resolving conflicting signals from medical literature, physiological trend data, and social community consensus before delivering advice to parents.
 
@@ -11,7 +11,7 @@ Single-prompt LLM apps can answer parenting questions. But parents don't need an
 - **Knows when to stop** and escalate to a human reviewer instead of hallucinating
 - **Cites every claim** so a pediatrician can audit the advice in 30 seconds
 
-NurtureMind does this with a swarm of four agents, a reflection loop, and a human-in-the-loop interrupt gate — all running on AWS Bedrock with DynamoDB-backed checkpointing for async resume.
+CalmDownDad does this with a swarm of four agents, a reflection loop, and a human-in-the-loop interrupt gate — all running on AWS Bedrock with DynamoDB-backed checkpointing for async resume.
 
 ## Architecture
 
@@ -303,21 +303,20 @@ npx ampx pipeline-deploy
 
 ## iOS App
 
-Two iOS apps are included:
+The CalmDownDad iOS app is located at `ios/CalmDownDad/`.
 
-| App | Path | Features |
-|-----|------|----------|
-| **NurtureMind** | `ios/NurtureMind/` | Core app, mock data |
-| **CalmDownDad** | `ios/CalmDownDad/` | Full app with Cognito auth, REST API |
+Features:
+- Cognito authentication (login/signup)
+- Baby management (CRUD)
+- Physiology logging (feeding, sleep, diaper)
+- AI parenting advice via `/ask` API
+- Daily health reports via `/report` API
 
 ### Build & Run
 
 ```bash
 # Open in Xcode
 open ios/CalmDownDad/CalmDownDad.xcodeproj
-
-# Or for NurtureMind
-open ios/NurtureMind/NurtureMind.xcodeproj
 ```
 
 ### iOS Configuration
@@ -340,8 +339,8 @@ For production deployment with Docker:
 
 ```bash
 # On EC2 (Ubuntu 22.04, t3.medium+)
-git clone https://github.com/builderxin11/babycare-ai-agent.git /opt/nurturemind
-cd /opt/nurturemind
+git clone https://github.com/builderxin11/babycare-ai-agent.git /opt/calmdowndad
+cd /opt/calmdowndad
 
 # Run setup
 ./deploy/scripts/setup-ec2.sh

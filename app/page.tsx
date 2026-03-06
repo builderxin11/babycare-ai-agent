@@ -123,7 +123,7 @@ export default function Dashboard() {
   if (showCreateFamily) {
     return (
       <div className="page">
-        <h1>Welcome to NurtureMind</h1>
+        <h1>Welcome to CalmDownDad</h1>
         <div className="card">
           <h3>Create your family</h3>
           <p style={{ marginBottom: "1rem" }}>Get started by setting up your family profile.</p>

@@ -6,7 +6,7 @@ enum Configuration {
     #if DEBUG
     static let agentAPIBaseURL = URL(string: "http://localhost:8000")!
     #else
-    static let agentAPIBaseURL = URL(string: "https://api.nurturemind.app")!
+    static let agentAPIBaseURL = URL(string: "https://api.calmdowndad.app")!
     #endif
 
     // MARK: - API Endpoints

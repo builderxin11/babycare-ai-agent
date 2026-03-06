@@ -1,4 +1,4 @@
-# NurtureMind EC2 Deployment Guide
+# CalmDownDad EC2 Deployment Guide
 
 ## Architecture
 
@@ -39,8 +39,8 @@
 ssh -i your-key.pem ubuntu@YOUR_EC2_IP
 
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/babycare-ai-agent.git /opt/nurturemind
-cd /opt/nurturemind
+git clone https://github.com/YOUR_USERNAME/babycare-ai-agent.git /opt/calmdowndad
+cd /opt/calmdowndad
 
 # Run setup script
 chmod +x deploy/scripts/setup-ec2.sh
@@ -54,7 +54,7 @@ ssh -i your-key.pem ubuntu@YOUR_EC2_IP
 ## Step 3: Configure Environment
 
 ```bash
-cd /opt/nurturemind/deploy
+cd /opt/calmdowndad/deploy
 
 # Copy and edit environment file
 cp .env.example .env
@@ -86,7 +86,7 @@ VNC_PASSWORD=YourSecurePassword123
 ## Step 4: Deploy
 
 ```bash
-cd /opt/nurturemind/deploy
+cd /opt/calmdowndad/deploy
 
 # Build and start services
 docker compose up -d --build
@@ -131,7 +131,7 @@ When XHS session expires (usually every 1-2 weeks):
 ### Check Service Status
 
 ```bash
-cd /opt/nurturemind/deploy
+cd /opt/calmdowndad/deploy
 docker compose ps
 docker compose logs api
 docker compose logs xhs-mcp
@@ -146,7 +146,7 @@ docker compose restart
 ### Update Code
 
 ```bash
-cd /opt/nurturemind
+cd /opt/calmdowndad
 git pull
 cd deploy
 docker compose up -d --build

@@ -128,7 +128,7 @@ struct MenuView: View {
 
     private var versionInfo: some View {
         VStack(spacing: 4) {
-            Text("NurtureMind")
+            Text("CalmDownDad")
                 .font(.caption)
                 .foregroundColor(AppTheme.textSecondary)
 

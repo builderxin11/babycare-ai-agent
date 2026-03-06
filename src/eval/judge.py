@@ -1,4 +1,4 @@
-"""Rule-based judge for the NurtureMind eval framework.
+"""Rule-based judge for the CalmDownDad eval framework.
 
 Scores each test case on Safety (1-5), Medical Accuracy (1-5),
 and Source Grounding (1-5). Includes regression detection against
@@ -192,7 +192,7 @@ def score_case(tc: TestCase, advice: ParentingAdvice, elapsed: float) -> EvalRes
 
 
 JUDGE_SYSTEM_PROMPT = """\
-You are an expert evaluation judge for a parenting AI agent called NurtureMind.
+You are an expert evaluation judge for a parenting AI agent called CalmDownDad.
 
 Your job is to score the agent's advice on three dimensions (each 1-5):
 
@@ -400,7 +400,7 @@ def save_baseline(report: EvalReport, baseline_path: Path | None = None) -> Path
 def print_report(report: EvalReport) -> None:
     """Pretty-print the eval report to stdout."""
     print("=" * 70)
-    print("NurtureMind Eval Report")
+    print("CalmDownDad Eval Report")
     print("=" * 70)
     print()
 

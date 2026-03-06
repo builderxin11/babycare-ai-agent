@@ -1,4 +1,4 @@
-# CLAUDE.md - NurtureMind Engineering Standards
+# CLAUDE.md - CalmDownDad Engineering Standards
 
 ## 1. Project Vision & Mission
 Build a production-grade **Multi-Agent System (MAS)** for parenting. The goal is to move beyond simple RAG to a **Reasoning & Reflection** architecture that handles data conflict and long-term state.

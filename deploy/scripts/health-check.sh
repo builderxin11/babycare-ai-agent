@@ -1,5 +1,5 @@
 #!/bin/bash
-# Health check script for NurtureMind services
+# Health check script for CalmDownDad services
 # Run via cron: */5 * * * * /path/to/health-check.sh
 
 set -e
@@ -8,7 +8,7 @@ set -e
 API_URL="${API_URL:-http://localhost:8000}"
 MCP_URL="${MCP_URL:-http://localhost:3000}"
 ALERT_EMAIL="${ALERT_EMAIL:-}"
-LOG_FILE="/var/log/nurturemind/health-check.log"
+LOG_FILE="/var/log/calmdowndad/health-check.log"
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -34,7 +34,7 @@ check_api() {
         log "API: OK"
         return 0
     else
-        send_alert "[NurtureMind] API Down" "FastAPI server is not responding at ${API_URL}"
+        send_alert "[CalmDownDad] API Down" "FastAPI server is not responding at ${API_URL}"
         return 1
     fi
 }
@@ -59,7 +59,7 @@ check_mcp() {
         log "MCP: OK"
         return 0
     else
-        send_alert "[NurtureMind] XHS MCP Issue" \
+        send_alert "[CalmDownDad] XHS MCP Issue" \
             "Xiaohongshu MCP server may need re-login. Access the desktop at http://YOUR_EC2_IP:6081 to login."
         return 1
     fi
@@ -104,7 +104,7 @@ check_xhs_login() {
         }' 2>&1) || true
 
     if echo "$search_response" | grep -q '"error"'; then
-        send_alert "[NurtureMind] XHS Login Expired" \
+        send_alert "[CalmDownDad] XHS Login Expired" \
             "Xiaohongshu session has expired. Please login again at http://YOUR_EC2_IP:6081"
         return 1
     fi

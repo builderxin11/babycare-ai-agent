@@ -1,4 +1,4 @@
-"""FastAPI wrapper for the NurtureMind multi-agent system.
+"""FastAPI wrapper for the CalmDownDad multi-agent system.
 
 Run: uvicorn src.api.server:app --port 8000 --reload
 """
@@ -18,7 +18,7 @@ from agent.report.generator import generate_daily_report
 from api import dynamodb_crud
 from api.auth import AuthenticatedUser, get_current_user
 
-app = FastAPI(title="NurtureMind Agent API", version="0.1.0")
+app = FastAPI(title="CalmDownDad Agent API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

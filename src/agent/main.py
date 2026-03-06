@@ -1,4 +1,4 @@
-"""Entry point for the NurtureMind multi-agent system.
+"""Entry point for the CalmDownDad multi-agent system.
 
 Run: python src/agent/main.py
 """
@@ -23,7 +23,7 @@ def run_demo() -> None:
     # Import here to allow clean error messages if deps are missing
     from agent.graph.builder import compile_graph
 
-    print("NurtureMind AI Agent -- Demo Run")
+    print("CalmDownDad AI Agent -- Demo Run")
     print(f"Question: {DEMO_QUESTION}")
     print()
 

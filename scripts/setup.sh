@@ -1,5 +1,5 @@
 #!/bin/bash
-# NurtureMind One-Click Setup Script
+# CalmDownDad One-Click Setup Script
 # Usage: ./scripts/setup.sh
 
 set -e
@@ -38,7 +38,7 @@ check_command() {
 # Header
 echo -e "${GREEN}"
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║           NurtureMind - AI Parenting Assistant                ║"
+echo "║           CalmDownDad - AI Parenting Assistant                ║"
 echo "║                    One-Click Setup                            ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"

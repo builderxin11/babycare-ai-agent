@@ -6,7 +6,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    container_name: nurturemind-api
+    container_name: calmdowndad-api
     ports:
       - "8000:8000"
     environment:
@@ -25,7 +25,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - nurturemind-net
+      - calmdowndad-net
 
   # Xiaohongshu MCP Server with VNC for login
   # Based on ubuntu-desktop with Chrome and MCP pre-installed
@@ -38,7 +38,7 @@ services:
       - "3000:3000"   # MCP API
       - "6080:80"     # Web VNC (access via browser to login)
     environment:
-      - VNC_PASSWORD=${VNC_PASSWORD:-nurturemind123}
+      - VNC_PASSWORD=${VNC_PASSWORD:-calmdowndad123}
       - RESOLUTION=1280x720
     volumes:
       # Persist browser session data
@@ -46,11 +46,11 @@ services:
     shm_size: '512m'
     restart: unless-stopped
     networks:
-      - nurturemind-net
+      - calmdowndad-net
 
 volumes:
   xhs-data:
 
 networks:
-  nurturemind-net:
+  calmdowndad-net:
     driver: bridge

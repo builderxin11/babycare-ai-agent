@@ -106,7 +106,7 @@ struct ContentView: View {
                 Text("👶")
                     .font(.system(size: 80))
 
-                Text("NurtureMind")
+                Text("CalmDownDad")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.pink)

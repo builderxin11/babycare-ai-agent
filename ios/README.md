@@ -1,6 +1,6 @@
-# NurtureMind iOS App
+# CalmDownDad iOS App
 
-Native iOS app for NurtureMind - 智能育儿助手
+Native iOS app for CalmDownDad - 智能育儿助手
 
 ## Design
 
@@ -31,15 +31,15 @@ The app includes 4 main tabs:
 ### 1. Create Xcode Project
 
 1. Open Xcode and create a new iOS App project:
-   - Product Name: `NurtureMind`
+   - Product Name: `CalmDownDad`
    - Team: Select your team
-   - Organization Identifier: `com.nurturemind`
+   - Organization Identifier: `com.calmdowndad`
    - Interface: SwiftUI
    - Language: Swift
 
-2. Delete the default `ContentView.swift` and `NurtureMindApp.swift` created by Xcode
+2. Delete the default `ContentView.swift` and `CalmDownDadApp.swift` created by Xcode
 
-3. Drag the contents of `ios/NurtureMind/` folder into the Xcode project:
+3. Drag the contents of `ios/CalmDownDad/` folder into the Xcode project:
    - App/
    - Models/
    - Services/
@@ -88,9 +88,9 @@ static let agentAPIBaseURL = URL(string: "https://your-production-api.com")!
 ## Project Structure
 
 ```
-NurtureMind/
+CalmDownDad/
 ├── App/
-│   ├── NurtureMindApp.swift      # Entry point
+│   ├── CalmDownDadApp.swift      # Entry point
 │   ├── ContentView.swift         # Main tab view
 │   └── Theme.swift               # Colors & styling
 ├── Models/

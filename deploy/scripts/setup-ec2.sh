@@ -1,10 +1,10 @@
 #!/bin/bash
-# EC2 Setup Script for NurtureMind
+# EC2 Setup Script for CalmDownDad
 # Run this on a fresh Amazon Linux 2023 or Ubuntu 22.04 instance
 
 set -e
 
-echo "=== NurtureMind EC2 Setup ==="
+echo "=== CalmDownDad EC2 Setup ==="
 
 # Detect OS
 if [ -f /etc/os-release ]; then
@@ -71,7 +71,7 @@ install_docker_compose() {
 setup_project() {
     echo "Setting up project directory..."
 
-    PROJECT_DIR="/opt/nurturemind"
+    PROJECT_DIR="/opt/calmdowndad"
     sudo mkdir -p $PROJECT_DIR
     sudo chown $USER:$USER $PROJECT_DIR
 
@@ -83,11 +83,11 @@ setup_cron() {
     echo "Setting up health check cron..."
 
     # Create log directory
-    sudo mkdir -p /var/log/nurturemind
-    sudo chown $USER:$USER /var/log/nurturemind
+    sudo mkdir -p /var/log/calmdowndad
+    sudo chown $USER:$USER /var/log/calmdowndad
 
     # Add cron job (every 5 minutes)
-    (crontab -l 2>/dev/null | grep -v "health-check.sh"; echo "*/5 * * * * /opt/nurturemind/deploy/scripts/health-check.sh") | crontab -
+    (crontab -l 2>/dev/null | grep -v "health-check.sh"; echo "*/5 * * * * /opt/calmdowndad/deploy/scripts/health-check.sh") | crontab -
 
     echo "Health check cron configured"
 }
@@ -119,9 +119,9 @@ echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
 echo "1. Log out and log back in (for docker group)"
-echo "2. Clone your repo to /opt/nurturemind"
+echo "2. Clone your repo to /opt/calmdowndad"
 echo "3. Copy .env.example to .env and fill in values"
-echo "4. Run: cd /opt/nurturemind/deploy && docker-compose up -d"
+echo "4. Run: cd /opt/calmdowndad/deploy && docker-compose up -d"
 echo "5. Access web VNC at http://YOUR_EC2_IP:6081 to login to Xiaohongshu"
 echo ""
 echo "Make sure your EC2 Security Group allows:"

@@ -127,7 +127,7 @@ def _get_mcp_session() -> tuple[Any, str]:
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "nurturemind", "version": "1.0"},
+                "clientInfo": {"name": "calmdowndad", "version": "1.0"},
             },
         },
         timeout=15,

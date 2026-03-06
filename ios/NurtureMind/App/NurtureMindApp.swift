@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct NurtureMindApp: App {
+struct CalmDownDadApp: App {
     @StateObject private var amplifyService = AmplifyService.shared
 
     var body: some Scene {
