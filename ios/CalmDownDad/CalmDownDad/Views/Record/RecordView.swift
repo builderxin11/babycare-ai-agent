@@ -3,6 +3,8 @@ import SwiftUI
 struct RecordView: View {
     @StateObject private var viewModel: RecordViewModel
     @ObservedObject var languageManager = LanguageManager.shared
+    @ObservedObject var buttonOrderManager = ButtonOrderManager.shared
+    @State private var showingReorderSheet = false
 
     init(baby: Baby) {
         _viewModel = StateObject(wrappedValue: RecordViewModel(baby: baby))
@@ -52,6 +54,9 @@ struct RecordView: View {
         .sheet(isPresented: $viewModel.showingAddCustomButton) {
             AddCustomButtonSheet(viewModel: viewModel)
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingReorderSheet) {
+            ReorderButtonsSheet()
         }
         .task {
             await viewModel.loadData()
@@ -232,42 +237,12 @@ struct RecordView: View {
     private var quickAddButtons: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                QuickAddButton(systemIcon: "cup.and.saucer.fill", title: L10n.formulaMilk, color: AppTheme.feedingColor) {
-                    viewModel.selectedLogType = .milkFormula
-                    viewModel.showingAddLog = true
-                }
-
-                QuickAddButton(systemIcon: "moon.zzz.fill", title: L10n.sleep, color: AppTheme.sleepColor) {
-                    viewModel.selectedLogType = .sleep
-                    viewModel.showingAddLog = true
-                }
-
-                QuickAddButton(systemIcon: "sun.horizon.fill", title: L10n.wakeUp, color: AppTheme.orange) {
-                    viewModel.showingWakeUpSheet = true
-                }
-
-                QuickAddButton(systemIcon: "drop.fill", title: L10n.dirtyDiaper, color: AppTheme.diaperColor) {
-                    viewModel.selectedLogType = .diaperDirty
-                    viewModel.showingAddLog = true
-                }
-
-                QuickAddButton(systemIcon: "bathtub.fill", title: L10n.bath, color: AppTheme.bathColor) {
-                    viewModel.selectedLogType = .bath
-                    viewModel.showingAddLog = true
-                }
-
-                QuickAddButton(systemIcon: "syringe.fill", title: L10n.vaccine, color: AppTheme.vaccineColor) {
-                    viewModel.showingVaccineSheet = true
-                }
-
-                QuickAddButton(systemIcon: "leaf.fill", title: L10n.solidFood, color: AppTheme.solidFoodColor) {
-                    viewModel.selectedLogType = .milkSolid
-                    viewModel.showingAddLog = true
-                }
-
-                QuickAddButton(systemIcon: "heart.fill", title: L10n.breastMilk, color: AppTheme.breastMilkColor) {
-                    viewModel.selectedLogType = .milkBreast
-                    viewModel.showingAddLog = true
+                // Ordered buttons from ButtonOrderManager
+                ForEach(buttonOrderManager.buttonOrder) { buttonType in
+                    quickButton(for: buttonType)
+                        .onLongPressGesture {
+                            showingReorderSheet = true
+                        }
                 }
 
                 // Custom buttons
@@ -282,11 +257,37 @@ struct RecordView: View {
                 QuickAddButton(systemIcon: "plus", title: L10n.custom, color: AppTheme.textSecondary) {
                     viewModel.showingAddCustomButton = true
                 }
+
+                // Reorder button
+                QuickAddButton(systemIcon: "arrow.up.arrow.down", title: L10n.reorderButtons, color: AppTheme.textSecondary) {
+                    showingReorderSheet = true
+                }
             }
             .padding(.horizontal)
         }
         .padding(.vertical, 12)
         .background(AppTheme.background)
+    }
+
+    @ViewBuilder
+    private func quickButton(for buttonType: QuickButtonType) -> some View {
+        QuickAddButton(systemIcon: buttonType.icon, title: buttonType.localizedName, color: buttonType.color) {
+            handleButtonTap(buttonType)
+        }
+    }
+
+    private func handleButtonTap(_ buttonType: QuickButtonType) {
+        switch buttonType {
+        case .wakeUp:
+            viewModel.showingWakeUpSheet = true
+        case .vaccine:
+            viewModel.showingVaccineSheet = true
+        default:
+            if let logType = buttonType.logType {
+                viewModel.selectedLogType = logType
+                viewModel.showingAddLog = true
+            }
+        }
     }
 
 }

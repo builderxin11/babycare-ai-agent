@@ -193,6 +193,11 @@ enum L10n {
     static var icon: String { loc("icon") }
     static var color: String { loc("color") }
 
+    // MARK: - Reorder Buttons
+    static var reorderButtons: String { loc("reorder_buttons") }
+    static var resetToDefault: String { loc("reset_to_default") }
+    static var done: String { loc("done") }
+
     // MARK: - Errors
     static var configurationError: String { loc("configuration_error") }
 
@@ -368,6 +373,11 @@ enum L10n {
         "icon": "图标",
         "color": "颜色",
 
+        // Reorder Buttons
+        "reorder_buttons": "调整按钮顺序",
+        "reset_to_default": "恢复默认顺序",
+        "done": "完成",
+
         // Errors
         "configuration_error": "配置错误",
 
@@ -532,6 +542,11 @@ enum L10n {
         "enter_name": "Enter name",
         "icon": "Icon",
         "color": "Color",
+
+        // Reorder Buttons
+        "reorder_buttons": "Reorder Buttons",
+        "reset_to_default": "Reset to Default",
+        "done": "Done",
 
         // Errors
         "configuration_error": "Configuration Error",
