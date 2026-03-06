@@ -6,10 +6,9 @@ Run: uvicorn src.api.server:app --port 8000 --reload
 from __future__ import annotations
 
 import uuid
+from typing import Annotated, Any
 
-from typing import Any
-
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -17,6 +16,7 @@ from agent.graph.builder import compile_graph
 from agent.models.outputs import DailyReport, ParentingAdvice
 from agent.report.generator import generate_daily_report
 from api import dynamodb_crud
+from api.auth import AuthenticatedUser, get_current_user
 
 app = FastAPI(title="NurtureMind Agent API", version="0.1.0")
 
@@ -222,21 +222,31 @@ class CreateBabyRequest(BaseModel):
 
 
 @app.get("/babies")
-async def list_babies() -> list[dict[str, Any]]:
-    """List all babies."""
+async def list_babies(
+    user: Annotated[AuthenticatedUser | None, Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """List all babies for the authenticated user."""
     try:
-        return dynamodb_crud.list_babies()
+        user_id = user.user_id if user else None
+        return dynamodb_crud.list_babies(user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/babies/{baby_id}")
-async def get_baby(baby_id: str) -> dict[str, Any]:
+async def get_baby(
+    baby_id: str,
+    user: Annotated[AuthenticatedUser | None, Depends(get_current_user)],
+) -> dict[str, Any]:
     """Get a single baby by ID."""
     try:
         baby = dynamodb_crud.get_baby(baby_id)
         if not baby:
             raise HTTPException(status_code=404, detail="Baby not found")
+        # Check ownership if authenticated
+        if user and baby.get("familyOwners"):
+            if user.user_id not in baby.get("familyOwners", []):
+                raise HTTPException(status_code=403, detail="Access denied")
         return baby
     except HTTPException:
         raise
@@ -245,15 +255,20 @@ async def get_baby(baby_id: str) -> dict[str, Any]:
 
 
 @app.post("/babies")
-async def create_baby(req: CreateBabyRequest) -> dict[str, Any]:
+async def create_baby(
+    req: CreateBabyRequest,
+    user: Annotated[AuthenticatedUser | None, Depends(get_current_user)],
+) -> dict[str, Any]:
     """Create a new baby."""
     try:
+        user_id = user.user_id if user else None
         return dynamodb_crud.create_baby(
             family_id=req.family_id,
             name=req.name,
             birth_date=req.birth_date,
             gender=req.gender,
             notes=req.notes,
+            user_id=user_id,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

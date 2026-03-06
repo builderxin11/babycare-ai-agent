@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuView: View {
     let baby: Baby
     @ObservedObject var languageManager = LanguageManager.shared
+    @ObservedObject var authService = AuthService.shared
 
     var body: some View {
         ScrollView {
@@ -28,6 +29,9 @@ struct MenuView: View {
                     MenuItem(systemIcon: "gearshape.fill", title: L10n.appSettings, subtitle: L10n.notificationLanguageTheme),
                     MenuItem(systemIcon: "questionmark.circle.fill", title: L10n.helpFeedback, subtitle: L10n.faqContactUs)
                 ])
+
+                // Account Section
+                accountSection
 
                 // Version info
                 versionInfo
@@ -124,6 +128,66 @@ struct MenuView: View {
             SettingsView()
         } else {
             PlaceholderView(title: item.title)
+        }
+    }
+
+    // MARK: - Account Section
+
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L10n.account)
+                .font(.headline)
+                .foregroundColor(AppTheme.textSecondary)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                // Logged in user info
+                if let user = authService.currentUser {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(AppTheme.pink)
+                            .frame(width: 40)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.loggedInAs)
+                                .font(.caption)
+                                .foregroundColor(AppTheme.textSecondary)
+
+                            Text(user.email)
+                                .font(.subheadline)
+                                .foregroundColor(AppTheme.textPrimary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding()
+
+                    Divider()
+                        .background(AppTheme.surfaceBackground)
+                }
+
+                // Logout button
+                Button {
+                    authService.signOut()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .font(.title2)
+                            .foregroundColor(.red)
+                            .frame(width: 40)
+
+                        Text(L10n.logout)
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+
+                        Spacer()
+                    }
+                    .padding()
+                }
+            }
+            .background(AppTheme.cardBackground)
+            .cornerRadius(12)
         }
     }
 

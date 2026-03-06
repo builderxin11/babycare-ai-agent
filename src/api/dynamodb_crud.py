@@ -28,8 +28,8 @@ def _get_table(table_name: str):
 # -----------------------------------------------------------------------------
 
 
-def list_babies() -> list[dict[str, Any]]:
-    """List all babies (scan - for MVP without auth filtering)."""
+def list_babies(user_id: str | None = None) -> list[dict[str, Any]]:
+    """List babies, optionally filtered by user ownership."""
     if not config.baby_table:
         logger.warning("BABY_TABLE not configured, returning empty list")
         return []
@@ -44,7 +44,14 @@ def list_babies() -> list[dict[str, Any]]:
         response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
         items.extend(response.get("Items", []))
 
-    logger.info("Listed %d babies", len(items))
+    # Filter by user ownership if authenticated
+    if user_id:
+        items = [
+            item for item in items
+            if user_id in item.get("familyOwners", [])
+        ]
+
+    logger.info("Listed %d babies for user %s", len(items), user_id or "anonymous")
     return items
 
 
@@ -64,6 +71,7 @@ def create_baby(
     birth_date: str,
     gender: str | None = None,
     notes: str | None = None,
+    user_id: str | None = None,
 ) -> dict[str, Any]:
     """Create a new baby."""
     if not config.baby_table:
@@ -85,9 +93,11 @@ def create_baby(
         item["gender"] = gender
     if notes:
         item["notes"] = notes
+    if user_id:
+        item["familyOwners"] = [user_id]
 
     table.put_item(Item=item)
-    logger.info("Created baby: %s", item["id"])
+    logger.info("Created baby: %s for user %s", item["id"], user_id or "anonymous")
     return item
 
 

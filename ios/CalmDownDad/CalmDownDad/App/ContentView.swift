@@ -3,12 +3,16 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var amplifyService: AmplifyService
     @EnvironmentObject var languageManager: LanguageManager
+    @ObservedObject var authService = AuthService.shared
     @StateObject private var babyListVM = BabyListViewModel()
     @State private var selectedTab = 0
 
     var body: some View {
         Group {
-            if amplifyService.configurationError != nil {
+            if !authService.isAuthenticated {
+                // Not logged in - show login
+                LoginView()
+            } else if amplifyService.configurationError != nil {
                 configurationErrorView
             } else if babyListVM.babies.isEmpty && !babyListVM.isLoading {
                 // No babies - show onboarding
@@ -23,7 +27,16 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            await babyListVM.loadBabies()
+            if authService.isAuthenticated {
+                await babyListVM.loadBabies()
+            }
+        }
+        .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                Task {
+                    await babyListVM.loadBabies()
+                }
+            }
         }
     }
 

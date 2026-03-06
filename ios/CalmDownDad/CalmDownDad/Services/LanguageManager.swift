@@ -201,6 +201,41 @@ enum L10n {
     // MARK: - Errors
     static var configurationError: String { loc("configuration_error") }
 
+    // MARK: - Auth
+    static var login: String { loc("login") }
+    static var signUp: String { loc("sign_up") }
+    static var logout: String { loc("logout") }
+    static var email: String { loc("email") }
+    static var password: String { loc("password") }
+    static var confirmPassword: String { loc("confirm_password") }
+    static var noAccount: String { loc("no_account") }
+    static var createAccount: String { loc("create_account") }
+    static var signUpSubtitle: String { loc("sign_up_subtitle") }
+    static var passwordRequirements: String { loc("password_requirements") }
+    static var passwordsDoNotMatch: String { loc("passwords_do_not_match") }
+    static var checkYourEmail: String { loc("check_your_email") }
+    static var verificationCode: String { loc("verification_code") }
+    static var confirm: String { loc("confirm") }
+    static var confirmed: String { loc("confirmed") }
+    static var resendCode: String { loc("resend_code") }
+    static var confirmationRequired: String { loc("confirmation_required") }
+    static var newPasswordRequired: String { loc("new_password_required") }
+    static var notAuthenticated: String { loc("not_authenticated") }
+    static var authenticationFailed: String { loc("authentication_failed") }
+    static var networkError: String { loc("network_error") }
+    static var account: String { loc("account") }
+    static var loggedInAs: String { loc("logged_in_as") }
+
+    static func confirmationCodeSent(email: String) -> String {
+        let lang = LanguageManager.shared.currentLanguage
+        switch lang {
+        case .chinese:
+            return "验证码已发送到 \(email)"
+        case .english:
+            return "Verification code sent to \(email)"
+        }
+    }
+
     // MARK: - Time
     static var minutesAgo: String { loc("minutes_ago") }
     static var hoursAgo: String { loc("hours_ago") }
@@ -381,6 +416,31 @@ enum L10n {
         // Errors
         "configuration_error": "配置错误",
 
+        // Auth
+        "login": "登录",
+        "sign_up": "注册",
+        "logout": "退出登录",
+        "email": "邮箱",
+        "password": "密码",
+        "confirm_password": "确认密码",
+        "no_account": "还没有账号？",
+        "create_account": "创建账号",
+        "sign_up_subtitle": "注册后可以同步数据到云端",
+        "password_requirements": "至少8位，包含大小写字母、数字和符号",
+        "passwords_do_not_match": "两次密码不一致",
+        "check_your_email": "请查收邮件",
+        "verification_code": "验证码",
+        "confirm": "确认",
+        "confirmed": "已确认",
+        "resend_code": "重新发送验证码",
+        "confirmation_required": "请先验证邮箱",
+        "new_password_required": "需要设置新密码",
+        "not_authenticated": "未登录",
+        "authentication_failed": "登录失败",
+        "network_error": "网络错误",
+        "account": "账户",
+        "logged_in_as": "已登录：",
+
         // Time
         "minutes_ago": "%d分钟前",
         "hours_ago": "%d小时前",
@@ -550,6 +610,31 @@ enum L10n {
 
         // Errors
         "configuration_error": "Configuration Error",
+
+        // Auth
+        "login": "Log In",
+        "sign_up": "Sign Up",
+        "logout": "Log Out",
+        "email": "Email",
+        "password": "Password",
+        "confirm_password": "Confirm Password",
+        "no_account": "Don't have an account?",
+        "create_account": "Create Account",
+        "sign_up_subtitle": "Sign up to sync your data to the cloud",
+        "password_requirements": "Min 8 chars, uppercase, lowercase, number, symbol",
+        "passwords_do_not_match": "Passwords do not match",
+        "check_your_email": "Check Your Email",
+        "verification_code": "Verification Code",
+        "confirm": "Confirm",
+        "confirmed": "Confirmed",
+        "resend_code": "Resend Code",
+        "confirmation_required": "Please verify your email first",
+        "new_password_required": "New password required",
+        "not_authenticated": "Not logged in",
+        "authentication_failed": "Authentication failed",
+        "network_error": "Network error",
+        "account": "Account",
+        "logged_in_as": "Logged in as:",
 
         // Time
         "minutes_ago": "%d min ago",

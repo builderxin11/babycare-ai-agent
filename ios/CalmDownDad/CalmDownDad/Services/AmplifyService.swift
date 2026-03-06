@@ -12,6 +12,7 @@ class AmplifyService: ObservableObject {
     @Published var configurationError: Error?
 
     private let session: URLSession
+    private let authService = AuthService.shared
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -24,12 +25,23 @@ class AmplifyService: ObservableObject {
         isConfigured = true
     }
 
+    // MARK: - Auth Helper
+
+    private func authenticatedRequest(url: URL) async throws -> URLRequest {
+        var request = URLRequest(url: url)
+        if let token = try? await authService.getAccessToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return request
+    }
+
     // MARK: - Baby CRUD
 
     func listBabies() async throws -> [Baby] {
         let url = Configuration.agentAPIBaseURL.appendingPathComponent("/babies")
+        let request = try await authenticatedRequest(url: url)
 
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AmplifyServiceError.invalidResponse
