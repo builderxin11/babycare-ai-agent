@@ -2,15 +2,17 @@ import Foundation
 
 // MARK: - AgentAPIService (Real API Calls)
 
-actor AgentAPIService {
+class AgentAPIService {
     static let shared = AgentAPIService()
 
     private let session: URLSession
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = Configuration.requestTimeout
-        config.timeoutIntervalForResource = Configuration.resourceTimeout
+        config.timeoutIntervalForRequest = 60.0  // Agent calls can take a while
+        config.timeoutIntervalForResource = 120.0
         self.session = URLSession(configuration: config)
     }
 
@@ -23,14 +25,15 @@ actor AgentAPIService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let requestBody = AskRequest(
+        let ageInMonths = calculateAgeInMonths(birthDate: baby.birthDate)
+        let requestBody = AgentAskRequest(
             question: question,
             baby_id: baby.id,
             baby_name: baby.name,
-            baby_age_months: baby.ageInMonths
+            baby_age_months: ageInMonths
         )
 
-        request.httpBody = try Configuration.jsonEncoder.encode(requestBody)
+        request.httpBody = try encoder.encode(requestBody)
 
         let (data, response) = try await session.data(for: request)
 
@@ -43,7 +46,7 @@ actor AgentAPIService {
             throw AgentAPIError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
 
-        let apiResponse = try Configuration.jsonDecoder.decode(AskResponse.self, from: data)
+        let apiResponse = try decoder.decode(AskResponse.self, from: data)
         return apiResponse.toParentingAdvice()
     }
 
@@ -56,13 +59,14 @@ actor AgentAPIService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let requestBody = ReportRequest(
+        let ageInMonths = calculateAgeInMonths(birthDate: baby.birthDate)
+        let requestBody = AgentReportRequest(
             baby_id: baby.id,
             baby_name: baby.name,
-            baby_age_months: baby.ageInMonths
+            baby_age_months: ageInMonths
         )
 
-        request.httpBody = try Configuration.jsonEncoder.encode(requestBody)
+        request.httpBody = try encoder.encode(requestBody)
 
         let (data, response) = try await session.data(for: request)
 
@@ -75,8 +79,16 @@ actor AgentAPIService {
             throw AgentAPIError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
 
-        let apiResponse = try Configuration.jsonDecoder.decode(ReportResponse.self, from: data)
+        let apiResponse = try decoder.decode(ReportResponse.self, from: data)
         return apiResponse.toDailyReport()
+    }
+
+    // MARK: - Helper
+
+    private func calculateAgeInMonths(birthDate: Date) -> Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.month], from: birthDate, to: Date())
+        return components.month ?? 0
     }
 
     // MARK: - Health Check
@@ -84,7 +96,7 @@ actor AgentAPIService {
     func healthCheck() async throws -> Bool {
         let url = Configuration.agentAPIBaseURL.appendingPathComponent(Configuration.Endpoints.health)
 
-        let (data, response) = try await session.data(from: url)
+        let (_, response) = try await session.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             return false
@@ -96,14 +108,14 @@ actor AgentAPIService {
 
 // MARK: - Request Models
 
-private struct AskRequest: Encodable {
+private struct AgentAskRequest: Encodable {
     let question: String
     let baby_id: String
     let baby_name: String
     let baby_age_months: Int
 }
 
-private struct ReportRequest: Encodable {
+private struct AgentReportRequest: Encodable {
     let baby_id: String
     let baby_name: String
     let baby_age_months: Int
@@ -147,7 +159,7 @@ private struct CitationResponse: Decodable {
     let url: String?
 
     func toCitation() -> Citation {
-        Citation(sourceType: source_type, reference: reference, url: url)
+        Citation(sourceType: source_type, reference: reference, detail: url)
     }
 }
 
@@ -185,6 +197,10 @@ private struct ReportResponse: Decodable {
     func toDailyReport() -> DailyReport {
         let dateFormatter = ISO8601DateFormatter()
 
+        // Convert [String: Double] to [String: AnyCodable]
+        let dataSnapshotConverted = data_snapshot.mapValues { AnyCodable($0) }
+        let baselineSnapshotConverted = baseline_snapshot.mapValues { AnyCodable($0) }
+
         return DailyReport(
             babyId: baby_id,
             babyName: baby_name,
@@ -197,8 +213,8 @@ private struct ReportResponse: Decodable {
             actionItems: action_items,
             warnings: warnings,
             citations: citations.map { $0.toCitation() },
-            dataSnapshot: data_snapshot,
-            baselineSnapshot: baseline_snapshot,
+            dataSnapshot: dataSnapshotConverted,
+            baselineSnapshot: baselineSnapshotConverted,
             generatedAt: dateFormatter.date(from: generated_at) ?? Date(),
             disclaimer: disclaimer
         )
@@ -224,12 +240,3 @@ enum AgentAPIError: LocalizedError {
     }
 }
 
-// MARK: - Baby Extension
-
-extension Baby {
-    var ageInMonths: Int {
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.month], from: birthDate, to: Date())
-        return components.month ?? 0
-    }
-}

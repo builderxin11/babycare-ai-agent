@@ -4,8 +4,12 @@ import Combine
 
 // MARK: - AmplifyService (REST API Backend)
 
-actor AmplifyService {
+@MainActor
+class AmplifyService: ObservableObject {
     static let shared = AmplifyService()
+
+    @Published var isConfigured = false
+    @Published var configurationError: Error?
 
     private let session: URLSession
 
@@ -14,6 +18,10 @@ actor AmplifyService {
         config.timeoutIntervalForRequest = 30.0
         config.timeoutIntervalForResource = 60.0
         self.session = URLSession(configuration: config)
+    }
+
+    func configure() async {
+        isConfigured = true
     }
 
     // MARK: - Baby CRUD
