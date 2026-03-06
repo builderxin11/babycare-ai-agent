@@ -164,7 +164,7 @@ struct EditLogSheet: View {
 
     private var showsAmount: Bool {
         switch logType {
-        case .milkBreast, .milkFormula, .milkSolid:
+        case .milkBreast, .milkFormula:
             return true
         default:
             return false
