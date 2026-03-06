@@ -39,11 +39,15 @@ struct ContentView: View {
                 case 0:
                     RecordView(baby: baby)
                 case 1:
-                    SummaryView(baby: baby)
+                    NavigationStack {
+                        SummaryView(baby: baby)
+                    }
                 case 2:
                     GrowthChartView(baby: baby)
                 case 3:
-                    MenuView(baby: baby)
+                    NavigationStack {
+                        MenuView(baby: baby)
+                    }
                 default:
                     RecordView(baby: baby)
                 }
