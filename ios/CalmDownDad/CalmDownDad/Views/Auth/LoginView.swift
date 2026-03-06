@@ -4,6 +4,7 @@ struct LoginView: View {
     @ObservedObject var authService = AuthService.shared
     @State private var email = ""
     @State private var password = ""
+    @State private var showPassword = false
     @State private var showSignUp = false
     @State private var showConfirmation = false
     @State private var confirmationEmail = ""
@@ -63,12 +64,27 @@ struct LoginView: View {
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
 
-                        SecureField("", text: $password)
-                            .textContentType(.password)
-                            .foregroundColor(AppTheme.textPrimary)
-                            .padding()
-                            .background(AppTheme.cardBackground)
-                            .cornerRadius(12)
+                        HStack {
+                            if showPassword {
+                                TextField("", text: $password)
+                                    .textContentType(.password)
+                                    .autocapitalization(.none)
+                            } else {
+                                SecureField("", text: $password)
+                                    .textContentType(.password)
+                            }
+
+                            Button {
+                                showPassword.toggle()
+                            } label: {
+                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundColor(AppTheme.textSecondary)
+                            }
+                        }
+                        .foregroundColor(AppTheme.textPrimary)
+                        .padding()
+                        .background(AppTheme.cardBackground)
+                        .cornerRadius(12)
                     }
 
                     // Error message
@@ -150,6 +166,8 @@ struct SignUpView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var showPassword = false
+    @State private var showConfirmPassword = false
     @State private var showConfirmation = false
 
     var body: some View {
@@ -196,12 +214,27 @@ struct SignUpView: View {
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                SecureField("", text: $password)
-                                    .textContentType(.newPassword)
-                                    .foregroundColor(AppTheme.textPrimary)
-                                    .padding()
-                                    .background(AppTheme.cardBackground)
-                                    .cornerRadius(12)
+                                HStack {
+                                    if showPassword {
+                                        TextField("", text: $password)
+                                            .textContentType(.newPassword)
+                                            .autocapitalization(.none)
+                                    } else {
+                                        SecureField("", text: $password)
+                                            .textContentType(.newPassword)
+                                    }
+
+                                    Button {
+                                        showPassword.toggle()
+                                    } label: {
+                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                            .foregroundColor(AppTheme.textSecondary)
+                                    }
+                                }
+                                .foregroundColor(AppTheme.textPrimary)
+                                .padding()
+                                .background(AppTheme.cardBackground)
+                                .cornerRadius(12)
 
                                 Text(L10n.passwordRequirements)
                                     .font(.caption2)
@@ -214,12 +247,27 @@ struct SignUpView: View {
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                SecureField("", text: $confirmPassword)
-                                    .textContentType(.newPassword)
-                                    .foregroundColor(AppTheme.textPrimary)
-                                    .padding()
-                                    .background(AppTheme.cardBackground)
-                                    .cornerRadius(12)
+                                HStack {
+                                    if showConfirmPassword {
+                                        TextField("", text: $confirmPassword)
+                                            .textContentType(.newPassword)
+                                            .autocapitalization(.none)
+                                    } else {
+                                        SecureField("", text: $confirmPassword)
+                                            .textContentType(.newPassword)
+                                    }
+
+                                    Button {
+                                        showConfirmPassword.toggle()
+                                    } label: {
+                                        Image(systemName: showConfirmPassword ? "eye.slash.fill" : "eye.fill")
+                                            .foregroundColor(AppTheme.textSecondary)
+                                    }
+                                }
+                                .foregroundColor(AppTheme.textPrimary)
+                                .padding()
+                                .background(AppTheme.cardBackground)
+                                .cornerRadius(12)
 
                                 if !confirmPassword.isEmpty && password != confirmPassword {
                                     Text(L10n.passwordsDoNotMatch)
