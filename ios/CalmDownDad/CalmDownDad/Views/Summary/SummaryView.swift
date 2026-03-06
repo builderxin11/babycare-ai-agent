@@ -4,6 +4,7 @@ import Combine
 struct SummaryView: View {
     let baby: Baby
     @StateObject private var viewModel: SummaryViewModel
+    @ObservedObject var languageManager = LanguageManager.shared
 
     init(baby: Baby) {
         self.baby = baby
@@ -28,10 +29,11 @@ struct SummaryView: View {
 
     private var headerView: some View {
         VStack(spacing: 8) {
-            Text("📊")
+            Image(systemName: "chart.bar.fill")
                 .font(.system(size: 40))
+                .foregroundColor(AppTheme.pink)
 
-            Text("本周摘要")
+            Text(L10n.weeklySummary)
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(AppTheme.textPrimary)
@@ -45,7 +47,7 @@ struct SummaryView: View {
 
     private var weeklyStatsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("本周统计")
+            Text(L10n.weeklyStats)
                 .font(.headline)
                 .foregroundColor(AppTheme.textPrimary)
 
@@ -54,34 +56,34 @@ struct SummaryView: View {
                 GridItem(.flexible())
             ], spacing: 12) {
                 StatCard(
-                    icon: "🍼",
-                    title: "喂养",
-                    value: "\(viewModel.weeklyStats.totalFeedings)次",
-                    subtitle: "共\(Int(viewModel.weeklyStats.totalFeedingMl))ml",
+                    systemIcon: "cup.and.saucer.fill",
+                    title: L10n.feeding,
+                    value: L10n.countString(viewModel.weeklyStats.totalFeedings),
+                    subtitle: L10n.mlString(Int(viewModel.weeklyStats.totalFeedingMl)),
                     color: AppTheme.feedingColor
                 )
 
                 StatCard(
-                    icon: "😴",
-                    title: "睡眠",
+                    systemIcon: "moon.zzz.fill",
+                    title: L10n.sleep,
                     value: viewModel.weeklyStats.avgSleepString,
-                    subtitle: "日均",
+                    subtitle: L10n.dailyAverage,
                     color: AppTheme.sleepColor
                 )
 
                 StatCard(
-                    icon: "💩",
-                    title: "换尿布",
-                    value: "\(viewModel.weeklyStats.totalDiapers)次",
-                    subtitle: "本周总计",
+                    systemIcon: "drop.fill",
+                    title: L10n.diaperChange,
+                    value: L10n.countString(viewModel.weeklyStats.totalDiapers),
+                    subtitle: L10n.weeklyTotal,
                     color: AppTheme.diaperColor
                 )
 
                 StatCard(
-                    icon: "🥣",
-                    title: "辅食",
-                    value: "\(viewModel.weeklyStats.totalSolidFeedings)次",
-                    subtitle: "本周总计",
+                    systemIcon: "leaf.fill",
+                    title: L10n.solidFood,
+                    value: L10n.countString(viewModel.weeklyStats.totalSolidFeedings),
+                    subtitle: L10n.weeklyTotal,
                     color: AppTheme.solidFoodColor
                 )
             }
@@ -90,21 +92,21 @@ struct SummaryView: View {
 
     private var trendsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("趋势")
+            Text(L10n.trends)
                 .font(.headline)
                 .foregroundColor(AppTheme.textPrimary)
 
             VStack(spacing: 8) {
                 TrendRow(
-                    icon: "🍼",
-                    title: "喂养量",
+                    systemIcon: "cup.and.saucer.fill",
+                    title: L10n.feedingAmount,
                     trend: viewModel.feedingTrend,
                     description: viewModel.feedingTrendDescription
                 )
 
                 TrendRow(
-                    icon: "😴",
-                    title: "睡眠时长",
+                    systemIcon: "moon.zzz.fill",
+                    title: L10n.sleepDurationTitle,
                     trend: viewModel.sleepTrend,
                     description: viewModel.sleepTrendDescription
                 )
@@ -120,15 +122,16 @@ struct SummaryView: View {
             AskView()
         } label: {
             HStack {
-                Text("✨")
+                Image(systemName: "sparkles")
                     .font(.title2)
+                    .foregroundColor(AppTheme.pink)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("AI 智能分析")
+                    Text(L10n.aiAnalysis)
                         .font(.headline)
                         .foregroundColor(AppTheme.textPrimary)
 
-                    Text("获取个性化育儿建议")
+                    Text(L10n.getPersonalizedAdvice)
                         .font(.caption)
                         .foregroundColor(AppTheme.textSecondary)
                 }
@@ -152,7 +155,7 @@ struct SummaryView: View {
 // MARK: - Stat Card
 
 struct StatCard: View {
-    let icon: String
+    let systemIcon: String
     let title: String
     let value: String
     let subtitle: String
@@ -161,8 +164,9 @@ struct StatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(icon)
+                Image(systemName: systemIcon)
                     .font(.title2)
+                    .foregroundColor(color)
 
                 Text(title)
                     .font(.caption)
@@ -188,15 +192,16 @@ struct StatCard: View {
 // MARK: - Trend Row
 
 struct TrendRow: View {
-    let icon: String
+    let systemIcon: String
     let title: String
     let trend: TrendDirection
     let description: String
 
     var body: some View {
         HStack {
-            Text(icon)
+            Image(systemName: systemIcon)
                 .font(.title3)
+                .foregroundColor(AppTheme.textSecondary)
 
             Text(title)
                 .font(.subheadline)
@@ -278,7 +283,7 @@ class SummaryViewModel: ObservableObject {
                 }
             case .diaperWet, .diaperDirty:
                 totalDiapers += 1
-            case .none:
+            case .bath, .none:
                 break
             }
         }
@@ -293,9 +298,9 @@ class SummaryViewModel: ObservableObject {
     }
 
     var feedingTrend: TrendDirection { .stable }
-    var feedingTrendDescription: String { "与上周持平" }
+    var feedingTrendDescription: String { L10n.sameAsLastWeek }
     var sleepTrend: TrendDirection { .improving }
-    var sleepTrendDescription: String { "增加30分钟" }
+    var sleepTrendDescription: String { "+30 min" }
 }
 
 struct WeeklyStats {
@@ -309,7 +314,7 @@ struct WeeklyStats {
         let avgMinutes = totalSleepMinutes / 7
         let hours = avgMinutes / 60
         let mins = avgMinutes % 60
-        return "\(hours)小时\(mins)分"
+        return L10n.shortDurationString(hours: hours, minutes: mins)
     }
 }
 

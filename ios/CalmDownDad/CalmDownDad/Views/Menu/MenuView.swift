@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuView: View {
     let baby: Baby
+    @ObservedObject var languageManager = LanguageManager.shared
 
     var body: some View {
         ScrollView {
@@ -10,22 +11,22 @@ struct MenuView: View {
                 babyProfileCard
 
                 // Menu Sections
-                menuSection(title: "数据", items: [
-                    MenuItem(icon: "📊", title: "每日报告", subtitle: "AI 生成的健康报告"),
-                    MenuItem(icon: "📅", title: "历史记录", subtitle: "查看所有记录"),
-                    MenuItem(icon: "📤", title: "导出数据", subtitle: "导出为 CSV 或 PDF")
+                menuSection(title: L10n.data, items: [
+                    MenuItem(systemIcon: "chart.bar.doc.horizontal.fill", title: L10n.dailyReport, subtitle: L10n.aiGeneratedReport),
+                    MenuItem(systemIcon: "calendar", title: L10n.history, subtitle: L10n.viewAllRecords),
+                    MenuItem(systemIcon: "square.and.arrow.up.fill", title: L10n.exportData, subtitle: L10n.exportAsCSVPDF)
                 ])
 
-                menuSection(title: "AI 功能", items: [
-                    MenuItem(icon: "✨", title: "智能问答", subtitle: "向 AI 咨询育儿问题"),
-                    MenuItem(icon: "🔔", title: "智能提醒", subtitle: "基于数据的喂养提醒")
+                menuSection(title: L10n.aiFeatures, items: [
+                    MenuItem(systemIcon: "sparkles", title: L10n.smartQA, subtitle: L10n.askAIQuestions),
+                    MenuItem(systemIcon: "bell.badge.fill", title: L10n.smartReminder, subtitle: L10n.dataBasedReminder)
                 ])
 
-                menuSection(title: "设置", items: [
-                    MenuItem(icon: "👶", title: "宝宝信息", subtitle: "编辑宝宝资料"),
-                    MenuItem(icon: "👨‍👩‍👧", title: "家庭成员", subtitle: "管理家庭成员"),
-                    MenuItem(icon: "⚙️", title: "应用设置", subtitle: "通知、语言、主题"),
-                    MenuItem(icon: "❓", title: "帮助与反馈", subtitle: "常见问题、联系我们")
+                menuSection(title: L10n.settings, items: [
+                    MenuItem(systemIcon: "face.smiling", title: L10n.babyInfo, subtitle: L10n.editBabyProfile),
+                    MenuItem(systemIcon: "person.3.fill", title: L10n.familyMembers, subtitle: L10n.manageFamilyMembers),
+                    MenuItem(systemIcon: "gearshape.fill", title: L10n.appSettings, subtitle: L10n.notificationLanguageTheme),
+                    MenuItem(systemIcon: "questionmark.circle.fill", title: L10n.helpFeedback, subtitle: L10n.faqContactUs)
                 ])
 
                 // Version info
@@ -46,8 +47,9 @@ struct MenuView: View {
                     .fill(AppTheme.pink.opacity(0.2))
                     .frame(width: 70, height: 70)
 
-                Text("👶")
+                Image(systemName: "face.smiling.inverse")
                     .font(.system(size: 35))
+                    .foregroundColor(AppTheme.pink)
             }
 
             // Info
@@ -62,7 +64,7 @@ struct MenuView: View {
                     .foregroundColor(AppTheme.textSecondary)
 
                 if let gender = baby.gender {
-                    Text(gender == .male ? "男孩" : "女孩")
+                    Text(gender == .male ? L10n.boy : L10n.girl)
                         .font(.caption2)
                         .foregroundColor(AppTheme.pink)
                 }
@@ -114,12 +116,13 @@ struct MenuView: View {
 
     @ViewBuilder
     private func destinationView(for item: MenuItem) -> some View {
-        switch item.title {
-        case "智能问答":
+        if item.title == L10n.smartQA {
             AskView()
-        case "每日报告":
+        } else if item.title == L10n.dailyReport {
             ReportsListView(baby: baby)
-        default:
+        } else if item.title == L10n.appSettings {
+            SettingsView()
+        } else {
             PlaceholderView(title: item.title)
         }
     }
@@ -128,11 +131,11 @@ struct MenuView: View {
 
     private var versionInfo: some View {
         VStack(spacing: 4) {
-            Text("NurtureMind")
+            Text(L10n.appName)
                 .font(.caption)
                 .foregroundColor(AppTheme.textSecondary)
 
-            Text("版本 1.0.0")
+            Text("\(L10n.version) 1.0.0")
                 .font(.caption2)
                 .foregroundColor(AppTheme.textSecondary.opacity(0.7))
         }
@@ -144,7 +147,7 @@ struct MenuView: View {
 
 struct MenuItem: Identifiable {
     let id = UUID()
-    let icon: String
+    let systemIcon: String
     let title: String
     let subtitle: String
 }
@@ -154,8 +157,9 @@ struct MenuItemRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text(item.icon)
+            Image(systemName: item.systemIcon)
                 .font(.title2)
+                .foregroundColor(AppTheme.pink)
                 .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -192,12 +196,12 @@ struct PlaceholderView: View {
                     .font(.system(size: 50))
                     .foregroundColor(AppTheme.textSecondary)
 
-                Text("功能开发中")
+                Text(L10n.featureInDevelopment)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.textPrimary)
 
-                Text("\(title) 即将推出")
+                Text(String(format: L10n.comingSoon.replacingOccurrences(of: "%@", with: "%@"), title))
                     .font(.caption)
                     .foregroundColor(AppTheme.textSecondary)
             }

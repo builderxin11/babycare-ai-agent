@@ -83,21 +83,25 @@ extension PhysiologyLogType {
     }
 
     var chineseName: String {
+        localizedName
+    }
+
+    var localizedName: String {
         switch self {
         case .milkBreast:
-            return "母乳"
+            return L10n.breastMilk
         case .milkFormula:
-            return "配方奶"
+            return L10n.formulaMilk
         case .milkSolid:
-            return "断奶食品"
+            return L10n.solidFood
         case .sleep:
-            return "睡觉"
+            return L10n.sleep
         case .diaperWet:
-            return "小便"
+            return L10n.wetDiaper
         case .diaperDirty:
-            return "便便"
+            return L10n.dirtyDiaper
         case .bath:
-            return "洗澡"
+            return L10n.bath
         }
     }
 }

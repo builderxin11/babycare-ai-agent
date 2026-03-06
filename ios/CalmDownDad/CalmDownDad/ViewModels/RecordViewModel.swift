@@ -187,7 +187,7 @@ class RecordViewModel: ObservableObject {
         let duration = Int(wakeUpTime.timeIntervalSince(originalLog.startTime) / 60)
         let hours = duration / 60
         let mins = duration % 60
-        let durationStr = hours > 0 ? "睡了\(hours)小时\(mins)分钟" : "睡了\(mins)分钟"
+        let durationStr = L10n.sleptForString(hours: hours, minutes: mins)
 
         // Create a new "wake up" record that shows in timeline
         let wakeUpLog = PhysiologyLog(
@@ -387,6 +387,6 @@ struct DailyStats {
     var sleepDurationString: String {
         let hours = sleepMinutes / 60
         let mins = sleepMinutes % 60
-        return "\(hours)小时\(mins)分钟"
+        return L10n.durationString(hours: hours, minutes: mins)
     }
 }

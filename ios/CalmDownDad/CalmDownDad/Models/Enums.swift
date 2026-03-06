@@ -236,10 +236,14 @@ enum GrowthMeasurementType: String, Codable, CaseIterable {
     }
 
     var chineseName: String {
+        localizedName
+    }
+
+    var localizedName: String {
         switch self {
-        case .weight: return "体重"
-        case .height: return "身高"
-        case .headCircumference: return "头围"
+        case .weight: return L10n.weight
+        case .height: return L10n.height
+        case .headCircumference: return L10n.headCircumference
         }
     }
 

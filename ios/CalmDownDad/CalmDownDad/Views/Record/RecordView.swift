@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RecordView: View {
     @StateObject private var viewModel: RecordViewModel
+    @ObservedObject var languageManager = LanguageManager.shared
 
     init(baby: Baby) {
         _viewModel = StateObject(wrappedValue: RecordViewModel(baby: baby))
@@ -91,7 +92,7 @@ struct RecordView: View {
                         .foregroundColor(AppTheme.pink)
 
                     if Calendar.current.isDateInToday(viewModel.selectedDate) {
-                        Text("今天")
+                        Text(L10n.today)
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
                     }
@@ -205,7 +206,7 @@ struct RecordView: View {
             HStack(spacing: 8) {
                 Image(systemName: "book.closed.fill")
                     .foregroundColor(AppTheme.pink)
-                Text("育儿日记")
+                Text(L10n.parentingDiary)
                     .font(.subheadline)
                     .foregroundColor(AppTheme.textPrimary)
             }
@@ -231,40 +232,40 @@ struct RecordView: View {
     private var quickAddButtons: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                QuickAddButton(systemIcon: "cup.and.saucer.fill", title: "配方奶", color: AppTheme.feedingColor) {
+                QuickAddButton(systemIcon: "cup.and.saucer.fill", title: L10n.formulaMilk, color: AppTheme.feedingColor) {
                     viewModel.selectedLogType = .milkFormula
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "moon.zzz.fill", title: "睡觉", color: AppTheme.sleepColor) {
+                QuickAddButton(systemIcon: "moon.zzz.fill", title: L10n.sleep, color: AppTheme.sleepColor) {
                     viewModel.selectedLogType = .sleep
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "sun.horizon.fill", title: "起床", color: AppTheme.orange) {
+                QuickAddButton(systemIcon: "sun.horizon.fill", title: L10n.wakeUp, color: AppTheme.orange) {
                     viewModel.showingWakeUpSheet = true
                 }
 
-                QuickAddButton(systemIcon: "drop.fill", title: "便便", color: AppTheme.diaperColor) {
+                QuickAddButton(systemIcon: "drop.fill", title: L10n.dirtyDiaper, color: AppTheme.diaperColor) {
                     viewModel.selectedLogType = .diaperDirty
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "bathtub.fill", title: "洗澡", color: AppTheme.bathColor) {
+                QuickAddButton(systemIcon: "bathtub.fill", title: L10n.bath, color: AppTheme.bathColor) {
                     viewModel.selectedLogType = .bath
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "syringe.fill", title: "疫苗", color: AppTheme.vaccineColor) {
+                QuickAddButton(systemIcon: "syringe.fill", title: L10n.vaccine, color: AppTheme.vaccineColor) {
                     viewModel.showingVaccineSheet = true
                 }
 
-                QuickAddButton(systemIcon: "leaf.fill", title: "辅食", color: AppTheme.solidFoodColor) {
+                QuickAddButton(systemIcon: "leaf.fill", title: L10n.solidFood, color: AppTheme.solidFoodColor) {
                     viewModel.selectedLogType = .milkSolid
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "heart.fill", title: "母乳", color: AppTheme.breastMilkColor) {
+                QuickAddButton(systemIcon: "heart.fill", title: L10n.breastMilk, color: AppTheme.breastMilkColor) {
                     viewModel.selectedLogType = .milkBreast
                     viewModel.showingAddLog = true
                 }
@@ -278,7 +279,7 @@ struct RecordView: View {
                 }
 
                 // Add custom button
-                QuickAddButton(systemIcon: "plus", title: "自定义", color: AppTheme.textSecondary) {
+                QuickAddButton(systemIcon: "plus", title: L10n.custom, color: AppTheme.textSecondary) {
                     viewModel.showingAddCustomButton = true
                 }
             }
@@ -350,13 +351,13 @@ struct TimelineHourSection: View {
                                 Button {
                                     onTap(log)
                                 } label: {
-                                    Label("编辑", systemImage: "pencil")
+                                    Label(L10n.edit, systemImage: "pencil")
                                 }
 
                                 Button(role: .destructive) {
                                     onDelete(log)
                                 } label: {
-                                    Label("删除", systemImage: "trash")
+                                    Label(L10n.delete, systemImage: "trash")
                                 }
                             }
                     }
@@ -433,7 +434,7 @@ struct TimelineEntryRow: View {
                         .foregroundColor(isInvalid ? AppTheme.textSecondary : AppTheme.textPrimary)
 
                     if isInvalid {
-                        Text("(无效)")
+                        Text(L10n.invalid)
                             .font(.caption2)
                             .foregroundColor(AppTheme.orange)
                     }
@@ -494,17 +495,25 @@ extension Baby {
         let years = components.year ?? 0
         let months = components.month ?? 0
         let days = components.day ?? 0
-        return "\(years)岁\(months)个月\(days)天"
+        return L10n.ageString(years: years, months: months, days: days)
     }
 }
 
 extension Date {
     var chineseFormatted: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "yyyy年M月d日 EEEE"
-        let weekday = formatter.string(from: self)
-        return weekday.replacingOccurrences(of: "星期", with: "周")
+        let lang = LanguageManager.shared.currentLanguage
+        switch lang {
+        case .chinese:
+            formatter.locale = Locale(identifier: "zh_CN")
+            formatter.dateFormat = "yyyy年M月d日 EEEE"
+            let weekday = formatter.string(from: self)
+            return weekday.replacingOccurrences(of: "星期", with: "周")
+        case .english:
+            formatter.locale = Locale(identifier: "en_US")
+            formatter.dateFormat = "EEEE, MMM d, yyyy"
+            return formatter.string(from: self)
+        }
     }
 }
 
@@ -526,16 +535,7 @@ extension PhysiologyLog {
     var timeAgoString: String? {
         let minutes = Int(-startTime.timeIntervalSinceNow / 60)
         if minutes < 0 { return nil } // Future time
-        if minutes < 60 {
-            return "\(minutes)分钟前"
-        } else {
-            let hours = minutes / 60
-            let mins = minutes % 60
-            if mins == 0 {
-                return "\(hours)小时前"
-            }
-            return "\(hours)小时\(mins)分钟前"
-        }
+        return L10n.timeAgoString(minutes: minutes)
     }
 
     /// Check if this is a wake-up marker (sleep log where startTime == endTime)
@@ -546,9 +546,9 @@ extension PhysiologyLog {
 
     var displayName: String {
         if isWakeUpMarker {
-            return "起床"
+            return L10n.wakeUp
         }
-        return type?.chineseName ?? "记录"
+        return type?.localizedName ?? L10n.tabRecord
     }
 
     var displayIcon: String {
@@ -567,24 +567,24 @@ extension PhysiologyLog {
         switch type {
         case .milkFormula, .milkBreast:
             if let amount = amount {
-                return "\(Int(amount))ml"
+                return L10n.mlString(Int(amount))
             }
         case .sleep:
             if let endTime = endTime {
                 let duration = Int(endTime.timeIntervalSince(startTime) / 60)
                 let hours = duration / 60
                 let mins = duration % 60
-                return "\(hours)小时\(mins)分钟"
+                return L10n.durationString(hours: hours, minutes: mins)
             }
-            return "睡眠中..."
+            return L10n.sleeping
         case .diaperDirty:
-            return notes ?? "大/软/茶色"
+            return notes ?? L10n.dirtyDiaper
         case .diaperWet:
-            return "小便"
+            return L10n.wetDiaper
         case .milkSolid:
-            return notes ?? "辅食"
+            return notes ?? L10n.solidFood
         case .bath:
-            return notes ?? "洗澡"
+            return notes ?? L10n.bath
         case .none:
             return nil
         }

@@ -46,7 +46,7 @@ struct AddLogSheet: View {
 
                             // Time picker
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("时间")
+                                Text(L10n.time)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -62,7 +62,7 @@ struct AddLogSheet: View {
                             // Amount picker (for feeding types)
                             if showsAmount {
                                 VStack(spacing: 8) {
-                                    Text("用量")
+                                    Text(L10n.amount)
                                         .font(.caption)
                                         .foregroundColor(AppTheme.textSecondary)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,11 +87,11 @@ struct AddLogSheet: View {
 
                             // Notes
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("备注")
+                                Text(L10n.notes)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("添加备注...", text: $notes)
+                                TextField(L10n.addNotes, text: $notes)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -105,7 +105,7 @@ struct AddLogSheet: View {
                     Button {
                         saveLog()
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -121,7 +121,7 @@ struct AddLogSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button(L10n.cancel) {
                         dismiss()
                     }
                     .foregroundColor(AppTheme.pink)
@@ -201,7 +201,7 @@ struct EditLogSheet: View {
 
                             // Time picker
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("时间")
+                                Text(L10n.time)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -217,7 +217,7 @@ struct EditLogSheet: View {
                             // Amount picker (for feeding types)
                             if showsAmount {
                                 VStack(spacing: 8) {
-                                    Text("用量")
+                                    Text(L10n.amount)
                                         .font(.caption)
                                         .foregroundColor(AppTheme.textSecondary)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -242,11 +242,11 @@ struct EditLogSheet: View {
 
                             // Notes
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("备注")
+                                Text(L10n.notes)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("添加备注...", text: $notes)
+                                TextField(L10n.addNotes, text: $notes)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -260,7 +260,7 @@ struct EditLogSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "trash")
-                                    Text("删除此记录")
+                                    Text(L10n.deleteRecord)
                                 }
                                 .font(.subheadline)
                                 .foregroundColor(.red)
@@ -277,7 +277,7 @@ struct EditLogSheet: View {
                     Button {
                         saveChanges()
                     } label: {
-                        Text("保存修改")
+                        Text(L10n.saveChanges)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -288,11 +288,11 @@ struct EditLogSheet: View {
                     .padding()
                 }
             }
-            .navigationTitle("编辑记录")
+            .navigationTitle(L10n.editRecord)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button(L10n.cancel) {
                         dismiss()
                     }
                     .foregroundColor(AppTheme.pink)
@@ -346,7 +346,7 @@ struct WakeUpSheet: View {
                     // Active sleep info
                     if let activeSleep = viewModel.activeSleepLog {
                         VStack(spacing: 8) {
-                            Text("对应的睡眠记录")
+                            Text(L10n.correspondingSleep)
                                 .font(.caption)
                                 .foregroundColor(AppTheme.textSecondary)
 
@@ -354,7 +354,7 @@ struct WakeUpSheet: View {
                                 Image(systemName: "moon.zzz.fill")
                                     .foregroundColor(AppTheme.sleepColor)
 
-                                Text("睡觉")
+                                Text(L10n.sleep)
                                     .foregroundColor(AppTheme.textPrimary)
 
                                 Text(activeSleep.startTime.formatted(date: .omitted, time: .shortened))
@@ -368,7 +368,7 @@ struct WakeUpSheet: View {
                         }
                         .padding(.horizontal)
                     } else {
-                        Text("没有进行中的睡眠记录")
+                        Text(L10n.noActiveSleep)
                             .font(.subheadline)
                             .foregroundColor(AppTheme.textSecondary)
                             .padding()
@@ -380,7 +380,7 @@ struct WakeUpSheet: View {
 
                     // Time picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("起床时间")
+                        Text(L10n.wakeUpTime)
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
 
@@ -405,10 +405,10 @@ struct WakeUpSheet: View {
                             Image(systemName: "clock")
                                 .foregroundColor(AppTheme.textSecondary)
 
-                            Text("睡眠时长: ")
+                            Text("\(L10n.sleepDuration): ")
                                 .foregroundColor(AppTheme.textSecondary)
 
-                            Text("\(hours)小时\(mins)分钟")
+                            Text(L10n.durationString(hours: hours, minutes: mins))
                                 .foregroundColor(duration >= 0 ? AppTheme.pink : AppTheme.orange)
                                 .fontWeight(.medium)
                         }
@@ -427,7 +427,7 @@ struct WakeUpSheet: View {
                     Button {
                         viewModel.recordWakeUp(at: wakeUpTime)
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -439,17 +439,17 @@ struct WakeUpSheet: View {
                     .padding(.bottom, 16)
                 }
             }
-            .navigationTitle("起床")
+            .navigationTitle(L10n.wakeUp)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button(L10n.cancel) {
                         dismiss()
                     }
                     .foregroundColor(AppTheme.pink)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button(L10n.save) {
                         viewModel.recordWakeUp(at: wakeUpTime)
                     }
                     .foregroundColor(AppTheme.pink)
@@ -472,10 +472,10 @@ struct VaccineSheet: View {
     @State private var vaccineDate: Date = Date()
     @State private var notes: String = ""
 
-    private let commonVaccines = [
-        "乙肝疫苗", "卡介苗", "脊灰疫苗", "百白破疫苗",
-        "麻腮风疫苗", "乙脑疫苗", "A群流脑疫苗", "甲肝疫苗"
-    ]
+    private var commonVaccines: [String] {
+        [L10n.hepatitisB, L10n.bcg, L10n.polio, L10n.dpt,
+         L10n.mmr, L10n.japaneseEncephalitis, L10n.meningococcalA, L10n.hepatitisA]
+    }
 
     var body: some View {
         NavigationStack {
@@ -499,11 +499,11 @@ struct VaccineSheet: View {
 
                             // Vaccine name
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("疫苗名称")
+                                Text(L10n.vaccineName)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("输入疫苗名称", text: $vaccineName)
+                                TextField(L10n.enterVaccineName, text: $vaccineName)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -512,7 +512,7 @@ struct VaccineSheet: View {
 
                             // Common vaccines
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("常见疫苗")
+                                Text(L10n.commonVaccines)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -535,7 +535,7 @@ struct VaccineSheet: View {
 
                             // Date picker
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("接种日期")
+                                Text(L10n.vaccinationDate)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -550,11 +550,11 @@ struct VaccineSheet: View {
 
                             // Notes
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("备注")
+                                Text(L10n.notes)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("添加备注...", text: $notes)
+                                TextField(L10n.addNotes, text: $notes)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -572,7 +572,7 @@ struct VaccineSheet: View {
                             notes: notes.isEmpty ? nil : notes
                         )
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -584,11 +584,11 @@ struct VaccineSheet: View {
                     .padding()
                 }
             }
-            .navigationTitle("疫苗记录")
+            .navigationTitle(L10n.vaccineRecord)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button(L10n.cancel) {
                         dismiss()
                     }
                     .foregroundColor(AppTheme.pink)
@@ -698,7 +698,7 @@ struct GrowthMeasurementSheet: View {
 
                             // Date picker
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("测量日期")
+                                Text(L10n.measurementDate)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -713,11 +713,11 @@ struct GrowthMeasurementSheet: View {
 
                             // Notes
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("备注")
+                                Text(L10n.notes)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("添加备注...", text: $notes)
+                                TextField(L10n.addNotes, text: $notes)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -736,7 +736,7 @@ struct GrowthMeasurementSheet: View {
                             notes: notes.isEmpty ? nil : notes
                         )
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -747,11 +747,11 @@ struct GrowthMeasurementSheet: View {
                     .padding()
                 }
             }
-            .navigationTitle(measurementType.chineseName)
+            .navigationTitle(measurementType.localizedName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button(L10n.cancel) {
                         dismiss()
                     }
                     .foregroundColor(AppTheme.pink)
@@ -803,7 +803,7 @@ struct CustomLogSheet: View {
 
                             // Time picker
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("时间")
+                                Text(L10n.time)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -818,11 +818,11 @@ struct CustomLogSheet: View {
 
                             // Notes
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("备注")
+                                Text(L10n.notes)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("添加备注...", text: $notes)
+                                TextField(L10n.addNotes, text: $notes)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -835,7 +835,7 @@ struct CustomLogSheet: View {
                     Button {
                         viewModel.addCustomLog(button: button, time: logTime, notes: notes.isEmpty ? nil : notes)
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -850,7 +850,7 @@ struct CustomLogSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(L10n.cancel) { dismiss() }
                         .foregroundColor(AppTheme.pink)
                 }
             }
@@ -907,11 +907,11 @@ struct AddCustomButtonSheet: View {
 
                             // Name input
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("名称")
+                                Text(L10n.name)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("输入名称", text: $name)
+                                TextField(L10n.enterName, text: $name)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -920,7 +920,7 @@ struct AddCustomButtonSheet: View {
 
                             // Icon selection
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("图标")
+                                Text(L10n.icon)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -942,7 +942,7 @@ struct AddCustomButtonSheet: View {
 
                             // Color selection
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("颜色")
+                                Text(L10n.color)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -969,7 +969,7 @@ struct AddCustomButtonSheet: View {
                     Button {
                         viewModel.addCustomButton(name: name, icon: selectedIcon, colorHex: selectedColor)
                     } label: {
-                        Text("添加")
+                        Text(L10n.add)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -981,11 +981,11 @@ struct AddCustomButtonSheet: View {
                     .padding()
                 }
             }
-            .navigationTitle("自定义按钮")
+            .navigationTitle(L10n.customButton)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(L10n.cancel) { dismiss() }
                         .foregroundColor(AppTheme.pink)
                 }
             }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var amplifyService: AmplifyService
+    @EnvironmentObject var languageManager: LanguageManager
     @StateObject private var babyListVM = BabyListViewModel()
     @State private var selectedTab = 0
 
@@ -59,7 +60,7 @@ struct ContentView: View {
         HStack {
             TabBarButton(
                 icon: "pencil",
-                title: "记录",
+                title: L10n.tabRecord,
                 isSelected: selectedTab == 0
             ) {
                 selectedTab = 0
@@ -67,7 +68,7 @@ struct ContentView: View {
 
             TabBarButton(
                 icon: "chart.bar",
-                title: "摘要",
+                title: L10n.tabSummary,
                 isSelected: selectedTab == 1
             ) {
                 selectedTab = 1
@@ -75,7 +76,7 @@ struct ContentView: View {
 
             TabBarButton(
                 icon: "chart.line.uptrend.xyaxis",
-                title: "成长曲线",
+                title: L10n.tabGrowthChart,
                 isSelected: selectedTab == 2
             ) {
                 selectedTab = 2
@@ -83,7 +84,7 @@ struct ContentView: View {
 
             TabBarButton(
                 icon: "line.3.horizontal",
-                title: "菜单",
+                title: L10n.tabMenu,
                 isSelected: selectedTab == 3
             ) {
                 selectedTab = 3
@@ -103,15 +104,22 @@ struct ContentView: View {
             VStack(spacing: 32) {
                 Spacer()
 
-                Text("👶")
-                    .font(.system(size: 80))
+                ZStack {
+                    Circle()
+                        .fill(AppTheme.pink.opacity(0.2))
+                        .frame(width: 120, height: 120)
 
-                Text("NurtureMind")
+                    Image(systemName: "face.smiling.inverse")
+                        .font(.system(size: 60))
+                        .foregroundColor(AppTheme.pink)
+                }
+
+                Text(L10n.appName)
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.pink)
 
-                Text("智能育儿助手")
+                Text(L10n.smartParentingAssistant)
                     .font(.title3)
                     .foregroundColor(AppTheme.textSecondary)
 
@@ -122,7 +130,7 @@ struct ContentView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                        Text("添加宝宝")
+                        Text(L10n.addBaby)
                     }
                     .font(.headline)
                     .foregroundColor(.white)
@@ -152,7 +160,7 @@ struct ContentView: View {
                     .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.pink))
                     .scaleEffect(1.5)
 
-                Text("加载中...")
+                Text(L10n.loading)
                     .foregroundColor(AppTheme.textSecondary)
             }
         }
@@ -169,7 +177,7 @@ struct ContentView: View {
                     .font(.system(size: 50))
                     .foregroundColor(AppTheme.orange)
 
-                Text("配置错误")
+                Text(L10n.configurationError)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.textPrimary)
@@ -185,7 +193,7 @@ struct ContentView: View {
                         await amplifyService.configure()
                     }
                 } label: {
-                    Label("重试", systemImage: "arrow.clockwise")
+                    Label(L10n.retry, systemImage: "arrow.clockwise")
                         .foregroundColor(AppTheme.pink)
                 }
                 .buttonStyle(.bordered)
@@ -244,13 +252,14 @@ struct AddBabySheetDark: View {
                             .fill(AppTheme.pink.opacity(0.2))
                             .frame(width: 100, height: 100)
 
-                        Text("👶")
+                        Image(systemName: "face.smiling.inverse")
                             .font(.system(size: 50))
+                            .foregroundColor(AppTheme.pink)
                     }
 
                     // Name input
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("宝宝昵称")
+                        Text(L10n.babyNickname)
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
 
@@ -263,7 +272,7 @@ struct AddBabySheetDark: View {
 
                     // Birth date picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("出生日期")
+                        Text(L10n.birthDate)
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
 
@@ -278,22 +287,22 @@ struct AddBabySheetDark: View {
 
                     // Gender selection
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("性别")
+                        Text(L10n.gender)
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
 
                         HStack(spacing: 12) {
                             GenderButton(
-                                icon: "👦",
-                                title: "男孩",
+                                systemIcon: "figure.stand",
+                                title: L10n.boy,
                                 isSelected: gender == .male
                             ) {
                                 gender = .male
                             }
 
                             GenderButton(
-                                icon: "👧",
-                                title: "女孩",
+                                systemIcon: "figure.stand.dress",
+                                title: L10n.girl,
                                 isSelected: gender == .female
                             ) {
                                 gender = .female
@@ -314,7 +323,7 @@ struct AddBabySheetDark: View {
                             )
                         }
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -326,11 +335,11 @@ struct AddBabySheetDark: View {
                 }
                 .padding()
             }
-            .navigationTitle("添加宝宝")
+            .navigationTitle(L10n.addBaby)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button(L10n.cancel) {
                         dismiss()
                     }
                     .foregroundColor(AppTheme.pink)
@@ -343,7 +352,7 @@ struct AddBabySheetDark: View {
 }
 
 struct GenderButton: View {
-    let icon: String
+    let systemIcon: String
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -351,8 +360,9 @@ struct GenderButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Text(icon)
+                Image(systemName: systemIcon)
                     .font(.title)
+                    .foregroundColor(isSelected ? AppTheme.pink : AppTheme.textSecondary)
 
                 Text(title)
                     .font(.caption)
@@ -373,4 +383,5 @@ struct GenderButton: View {
 #Preview {
     ContentView()
         .environmentObject(AmplifyService.shared)
+        .environmentObject(LanguageManager.shared)
 }

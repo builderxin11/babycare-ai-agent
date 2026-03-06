@@ -5,6 +5,7 @@ struct GrowthChartView: View {
     let baby: Baby
 
     @ObservedObject private var dataStore = GrowthDataStore.shared
+    @ObservedObject var languageManager = LanguageManager.shared
     @State private var selectedMetric: GrowthMetric = .weight
     @State private var showingAddSheet = false
     @State private var selectedMeasurementType: GrowthMeasurementType = .weight
@@ -62,7 +63,7 @@ struct GrowthChartView: View {
 
     private func latestValueCard(_ measurement: GrowthMeasurement) -> some View {
         VStack(spacing: 8) {
-            Text("最新测量")
+            Text(L10n.latestMeasurement)
                 .font(.caption)
                 .foregroundColor(AppTheme.textSecondary)
 
@@ -88,12 +89,12 @@ struct GrowthChartView: View {
                 .font(.system(size: 40))
                 .foregroundColor(AppTheme.pink)
 
-            Text("成长曲线")
+            Text(L10n.growthChart)
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(AppTheme.textPrimary)
 
-            Text("基于WHO标准")
+            Text(L10n.basedOnWHO)
                 .font(.caption)
                 .foregroundColor(AppTheme.textSecondary)
         }
@@ -180,7 +181,7 @@ struct GrowthChartView: View {
                             .font(.system(size: 40))
                             .foregroundColor(AppTheme.textSecondary)
 
-                        Text("添加至少2条测量数据以查看成长曲线")
+                        Text(L10n.needMoreData)
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
                     }
@@ -193,7 +194,7 @@ struct GrowthChartView: View {
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("测量记录")
+            Text(L10n.measurementRecords)
                 .font(.headline)
                 .foregroundColor(AppTheme.textPrimary)
 
@@ -230,20 +231,20 @@ struct GrowthChartView: View {
 
     private var referenceSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("参考范围")
+            Text(L10n.referenceRange)
                 .font(.headline)
                 .foregroundColor(AppTheme.textPrimary)
 
             HStack(spacing: 16) {
                 ReferenceCard(
-                    title: "同龄标准",
+                    title: L10n.ageStandard,
                     value: selectedMetric.standardRange,
                     color: AppTheme.green
                 )
 
                 ReferenceCard(
-                    title: "当前百分位",
-                    value: "待测量",
+                    title: L10n.currentPercentile,
+                    value: L10n.toMeasure,
                     color: AppTheme.pink
                 )
             }
@@ -259,7 +260,7 @@ struct GrowthChartView: View {
         } label: {
             HStack {
                 Image(systemName: "plus.circle.fill")
-                Text("添加\(selectedMetric.chineseName)记录")
+                Text(L10n.addRecordString(for: selectedMetric.localizedName))
             }
             .font(.headline)
             .foregroundColor(.white)
@@ -357,7 +358,7 @@ struct GrowthChartAddSheet: View {
 
                             // Date
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("测量日期")
+                                Text(L10n.measurementDate)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
@@ -372,11 +373,11 @@ struct GrowthChartAddSheet: View {
 
                             // Notes
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("备注")
+                                Text(L10n.notes)
                                     .font(.caption)
                                     .foregroundColor(AppTheme.textSecondary)
 
-                                TextField("添加备注...", text: $notes)
+                                TextField(L10n.addNotes, text: $notes)
                                     .foregroundColor(AppTheme.textPrimary)
                             }
                             .padding()
@@ -396,7 +397,7 @@ struct GrowthChartAddSheet: View {
                         )
                         onSave(measurement)
                     } label: {
-                        Text("保存")
+                        Text(L10n.save)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -407,11 +408,11 @@ struct GrowthChartAddSheet: View {
                     .padding()
                 }
             }
-            .navigationTitle(measurementType.chineseName)
+            .navigationTitle(measurementType.localizedName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(L10n.cancel) { dismiss() }
                         .foregroundColor(AppTheme.pink)
                 }
             }
@@ -462,18 +463,22 @@ enum GrowthMetric: CaseIterable {
     }
 
     var chineseName: String {
+        localizedName
+    }
+
+    var localizedName: String {
         switch self {
-        case .weight: return "体重"
-        case .height: return "身高"
-        case .headCircumference: return "头围"
+        case .weight: return L10n.weight
+        case .height: return L10n.height
+        case .headCircumference: return L10n.headCircumference
         }
     }
 
     var chartTitle: String {
         switch self {
-        case .weight: return "体重变化 (kg)"
-        case .height: return "身高变化 (cm)"
-        case .headCircumference: return "头围变化 (cm)"
+        case .weight: return L10n.weightChange
+        case .height: return L10n.heightChange
+        case .headCircumference: return L10n.headCircumferenceChange
         }
     }
 
