@@ -15,6 +15,9 @@ enum Configuration {
         static let ask = "/ask"
         static let report = "/report"
         static let health = "/health"
+        static let babies = "/babies"
+        static let logs = "/logs"
+        static let events = "/events"
     }
 
     // MARK: - Timeouts

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import uuid
 
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -14,6 +16,7 @@ from pydantic import BaseModel, Field
 from agent.graph.builder import compile_graph
 from agent.models.outputs import DailyReport, ParentingAdvice
 from agent.report.generator import generate_daily_report
+from api import dynamodb_crud
 
 app = FastAPI(title="NurtureMind Agent API", version="0.1.0")
 
@@ -23,7 +26,7 @@ app.add_middleware(
         "http://localhost:3000",  # Web frontend
         "*",  # Allow iOS simulator and other local clients (dev only)
     ],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -203,3 +206,164 @@ async def generate_report(req: ReportRequest) -> ReportResponse:
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+# -----------------------------------------------------------------------------
+# Baby CRUD Endpoints
+# -----------------------------------------------------------------------------
+
+
+class CreateBabyRequest(BaseModel):
+    family_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    birth_date: str = Field(min_length=10)  # YYYY-MM-DD
+    gender: str | None = None
+    notes: str | None = None
+
+
+@app.get("/babies")
+async def list_babies() -> list[dict[str, Any]]:
+    """List all babies."""
+    try:
+        return dynamodb_crud.list_babies()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/babies/{baby_id}")
+async def get_baby(baby_id: str) -> dict[str, Any]:
+    """Get a single baby by ID."""
+    try:
+        baby = dynamodb_crud.get_baby(baby_id)
+        if not baby:
+            raise HTTPException(status_code=404, detail="Baby not found")
+        return baby
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/babies")
+async def create_baby(req: CreateBabyRequest) -> dict[str, Any]:
+    """Create a new baby."""
+    try:
+        return dynamodb_crud.create_baby(
+            family_id=req.family_id,
+            name=req.name,
+            birth_date=req.birth_date,
+            gender=req.gender,
+            notes=req.notes,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.delete("/babies/{baby_id}")
+async def delete_baby(baby_id: str) -> dict[str, str]:
+    """Delete a baby by ID."""
+    try:
+        dynamodb_crud.delete_baby(baby_id)
+        return {"status": "deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# -----------------------------------------------------------------------------
+# PhysiologyLog CRUD Endpoints
+# -----------------------------------------------------------------------------
+
+
+class CreateLogRequest(BaseModel):
+    type: str = Field(min_length=1)
+    start_time: str = Field(min_length=1)  # ISO-8601 datetime
+    end_time: str | None = None
+    amount: float | None = None
+    unit: str | None = None
+    notes: str | None = None
+
+
+@app.get("/babies/{baby_id}/logs")
+async def list_logs(baby_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    """List physiology logs for a baby."""
+    try:
+        return dynamodb_crud.list_physiology_logs(baby_id, limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/babies/{baby_id}/logs")
+async def create_log(baby_id: str, req: CreateLogRequest) -> dict[str, Any]:
+    """Create a new physiology log."""
+    try:
+        return dynamodb_crud.create_physiology_log(
+            baby_id=baby_id,
+            log_type=req.type,
+            start_time=req.start_time,
+            end_time=req.end_time,
+            amount=req.amount,
+            unit=req.unit,
+            notes=req.notes,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.delete("/logs/{log_id}")
+async def delete_log(log_id: str) -> dict[str, str]:
+    """Delete a physiology log by ID."""
+    try:
+        dynamodb_crud.delete_physiology_log(log_id)
+        return {"status": "deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# -----------------------------------------------------------------------------
+# ContextEvent CRUD Endpoints
+# -----------------------------------------------------------------------------
+
+
+class CreateEventRequest(BaseModel):
+    type: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    start_date: str = Field(min_length=10)  # YYYY-MM-DD
+    end_date: str | None = None
+    notes: str | None = None
+    metadata: dict | None = None
+
+
+@app.get("/babies/{baby_id}/events")
+async def list_events(baby_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """List context events for a baby."""
+    try:
+        return dynamodb_crud.list_context_events(baby_id, limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/babies/{baby_id}/events")
+async def create_event(baby_id: str, req: CreateEventRequest) -> dict[str, Any]:
+    """Create a new context event."""
+    try:
+        return dynamodb_crud.create_context_event(
+            baby_id=baby_id,
+            event_type=req.type,
+            title=req.title,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            notes=req.notes,
+            metadata=req.metadata,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.delete("/events/{event_id}")
+async def delete_event(event_id: str) -> dict[str, str]:
+    """Delete a context event by ID."""
+    try:
+        dynamodb_crud.delete_context_event(event_id)
+        return {"status": "deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e

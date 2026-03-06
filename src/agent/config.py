@@ -26,6 +26,7 @@ class AgentConfig:
     xhs_max_posts: int = 5  # env: XHS_MAX_POSTS (was 3, increased for better coverage)
 
     # DynamoDB table names (Amplify Gen 2 dynamic names)
+    baby_table: str = ""  # env: BABY_TABLE
     physiology_log_table: str = ""  # env: PHYSIOLOGY_LOG_TABLE
     context_event_table: str = ""  # env: CONTEXT_EVENT_TABLE
     data_lookback_days: int = 7  # env: DATA_LOOKBACK_DAYS
@@ -58,6 +59,7 @@ class AgentConfig:
             bedrock_kb_id=os.getenv("BEDROCK_KB_ID", ""),
             xhs_mcp_url=os.getenv("XHS_MCP_URL", ""),
             xhs_max_posts=int(os.getenv("XHS_MAX_POSTS", "5")),
+            baby_table=os.getenv("BABY_TABLE", ""),
             physiology_log_table=os.getenv("PHYSIOLOGY_LOG_TABLE", ""),
             context_event_table=os.getenv("CONTEXT_EVENT_TABLE", ""),
             data_lookback_days=int(os.getenv("DATA_LOOKBACK_DAYS", "7")),
