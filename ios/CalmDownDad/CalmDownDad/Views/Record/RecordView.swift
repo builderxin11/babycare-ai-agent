@@ -16,14 +16,40 @@ struct RecordView: View {
                 dailySummaryBar
                 timelineView
                 diarySection
-                Spacer()
+                Spacer(minLength: 0)
                 quickAddButtons
             }
-
-            floatingButtons
         }
         .sheet(isPresented: $viewModel.showingAddLog) {
             AddLogSheet(viewModel: viewModel)
+                .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $viewModel.showingWakeUpSheet) {
+            WakeUpSheet(viewModel: viewModel)
+                .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $viewModel.showingEditLog) {
+            if let log = viewModel.editingLog {
+                EditLogSheet(viewModel: viewModel, log: log)
+                    .presentationDetents([.medium])
+            }
+        }
+        .sheet(isPresented: $viewModel.showingVaccineSheet) {
+            VaccineSheet(viewModel: viewModel)
+                .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $viewModel.showingGrowthSheet) {
+            GrowthMeasurementSheet(viewModel: viewModel)
+                .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $viewModel.showingCustomLogSheet) {
+            if let button = viewModel.selectedCustomButton {
+                CustomLogSheet(viewModel: viewModel, button: button)
+                    .presentationDetents([.medium])
+            }
+        }
+        .sheet(isPresented: $viewModel.showingAddCustomButton) {
+            AddCustomButtonSheet(viewModel: viewModel)
                 .presentationDetents([.medium])
         }
         .task {
@@ -35,67 +61,53 @@ struct RecordView: View {
 
     private var headerView: some View {
         VStack(spacing: 8) {
-            HStack {
-                Button(action: {}) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(AppTheme.pink)
-                        .font(.title2)
-                }
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    Image(systemName: "face.smiling")
-                        .font(.title2)
-                        .foregroundColor(AppTheme.pink)
-                    Text(viewModel.baby.ageChineseString)
-                        .foregroundColor(AppTheme.textPrimary)
-                        .font(.subheadline)
-                }
-
-                Spacer()
-
-                Button(action: {}) {
-                    Text("升级")
-                        .font(.caption)
-                        .foregroundColor(AppTheme.textSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.textSecondary, lineWidth: 1)
-                        )
-                }
+            HStack(spacing: 8) {
+                Image(systemName: "face.smiling")
+                    .font(.title2)
+                    .foregroundColor(AppTheme.pink)
+                Text(viewModel.baby.ageChineseString)
+                    .foregroundColor(AppTheme.textPrimary)
+                    .font(.subheadline)
             }
             .padding(.horizontal)
 
+            // Date selector with swipe
             HStack {
+                Button {
+                    viewModel.goToPreviousDay()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(AppTheme.pink)
+                        .font(.title2)
+                        .frame(width: 44, height: 44)
+                }
+
                 Spacer()
 
-                Text(viewModel.selectedDate.chineseFormatted)
-                    .font(.title2)
-                    .fontWeight(.medium)
-                    .foregroundColor(AppTheme.pink)
+                VStack(spacing: 4) {
+                    Text(viewModel.selectedDate.chineseFormatted)
+                        .font(.title2)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppTheme.pink)
 
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("出生后")
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.textSecondary)
-                    HStack(spacing: 2) {
-                        Text("第")
-                            .font(.caption)
-                            .foregroundColor(AppTheme.textSecondary)
-                        Text("\(viewModel.baby.ageInDays)")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(AppTheme.textPrimary)
-                        Text("天")
+                    if Calendar.current.isDateInToday(viewModel.selectedDate) {
+                        Text("今天")
                             .font(.caption)
                             .foregroundColor(AppTheme.textSecondary)
                     }
                 }
+
+                Spacer()
+
+                Button {
+                    viewModel.goToNextDay()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(viewModel.canGoToNextDay ? AppTheme.pink : AppTheme.textSecondary.opacity(0.3))
+                        .font(.title2)
+                        .frame(width: 44, height: 44)
+                }
+                .disabled(!viewModel.canGoToNextDay)
             }
             .padding(.horizontal)
         }
@@ -128,8 +140,8 @@ struct RecordView: View {
             }
 
             HStack(spacing: 4) {
-                Image(systemName: "circle.fill")
-                    .font(.system(size: 8))
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 10))
                     .foregroundColor(AppTheme.diaperColor)
                 Text("\(viewModel.dailyStats.diaperCount)次")
                     .font(.caption)
@@ -148,56 +160,42 @@ struct RecordView: View {
     private var timelineView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                HStack(alignment: .top, spacing: 0) {
-                    hourMarkersColumn
-                    timelineEntriesColumn
+                LazyVStack(spacing: 0) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        TimelineHourSection(
+                            hour: hour,
+                            logs: viewModel.logsForHour(hour),
+                            isInvalidSleep: { viewModel.isInvalidSleep($0) },
+                            onTap: { viewModel.startEditingLog($0) },
+                            onDelete: { viewModel.deleteLog($0) }
+                        )
+                        .id(hour)
+                    }
                 }
             }
             .onAppear {
                 let currentHour = Calendar.current.component(.hour, from: Date())
-                proxy.scrollTo(currentHour, anchor: .center)
-            }
-        }
-    }
-
-    private var hourMarkersColumn: some View {
-        VStack(spacing: 0) {
-            ForEach(0..<24, id: \.self) { hour in
-                HStack(spacing: 4) {
-                    Text("\(hour)")
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.textSecondary)
-                        .frame(width: 20, alignment: .trailing)
-
-                    activityIndicator(for: hour)
+                withAnimation {
+                    proxy.scrollTo(currentHour, anchor: .center)
                 }
-                .frame(height: 44)
-                .id(hour)
             }
         }
-        .padding(.leading, 8)
-    }
-
-    private func activityIndicator(for hour: Int) -> some View {
-        let activities = viewModel.activitiesForHour(hour)
-
-        return HStack(spacing: 2) {
-            ForEach(activities.prefix(3), id: \.id) { log in
-                Circle()
-                    .fill(log.type?.themeColor ?? AppTheme.textSecondary)
-                    .frame(width: 6, height: 6)
-            }
-        }
-        .frame(width: 24, alignment: .leading)
-    }
-
-    private var timelineEntriesColumn: some View {
-        LazyVStack(spacing: 0) {
-            ForEach(viewModel.sortedLogs) { log in
-                TimelineEntryRow(log: log)
-            }
-        }
-        .padding(.leading, 8)
+        .gesture(
+            DragGesture(minimumDistance: 50)
+                .onEnded { value in
+                    if value.translation.width > 50 {
+                        // Swipe right -> previous day
+                        withAnimation {
+                            viewModel.goToPreviousDay()
+                        }
+                    } else if value.translation.width < -50 && viewModel.canGoToNextDay {
+                        // Swipe left -> next day
+                        withAnimation {
+                            viewModel.goToNextDay()
+                        }
+                    }
+                }
+        )
     }
 
     // MARK: - Diary Section
@@ -243,8 +241,8 @@ struct RecordView: View {
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "sun.horizon.fill", title: "起床", color: AppTheme.sleepColor) {
-                    viewModel.recordWakeUp()
+                QuickAddButton(systemIcon: "sun.horizon.fill", title: "起床", color: AppTheme.orange) {
+                    viewModel.showingWakeUpSheet = true
                 }
 
                 QuickAddButton(systemIcon: "drop.fill", title: "便便", color: AppTheme.diaperColor) {
@@ -252,14 +250,36 @@ struct RecordView: View {
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "leaf.fill", title: "断奶食品", color: AppTheme.solidFoodColor) {
+                QuickAddButton(systemIcon: "bathtub.fill", title: "洗澡", color: AppTheme.bathColor) {
+                    viewModel.selectedLogType = .bath
+                    viewModel.showingAddLog = true
+                }
+
+                QuickAddButton(systemIcon: "syringe.fill", title: "疫苗", color: AppTheme.vaccineColor) {
+                    viewModel.showingVaccineSheet = true
+                }
+
+                QuickAddButton(systemIcon: "leaf.fill", title: "辅食", color: AppTheme.solidFoodColor) {
                     viewModel.selectedLogType = .milkSolid
                     viewModel.showingAddLog = true
                 }
 
-                QuickAddButton(systemIcon: "heart.fill", title: "瓶喂母乳", color: AppTheme.breastMilkColor) {
+                QuickAddButton(systemIcon: "heart.fill", title: "母乳", color: AppTheme.breastMilkColor) {
                     viewModel.selectedLogType = .milkBreast
                     viewModel.showingAddLog = true
+                }
+
+                // Custom buttons
+                ForEach(viewModel.customButtons) { button in
+                    QuickAddButton(systemIcon: button.icon, title: button.name, color: Color(hex: button.colorHex)) {
+                        viewModel.selectedCustomButton = button
+                        viewModel.showingCustomLogSheet = true
+                    }
+                }
+
+                // Add custom button
+                QuickAddButton(systemIcon: "plus", title: "自定义", color: AppTheme.textSecondary) {
+                    viewModel.showingAddCustomButton = true
                 }
             }
             .padding(.horizontal)
@@ -268,36 +288,83 @@ struct RecordView: View {
         .background(AppTheme.background)
     }
 
-    // MARK: - Floating Buttons
+}
 
-    private var floatingButtons: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                VStack(spacing: 12) {
-                    Button(action: {}) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(AppTheme.pink)
-                            .clipShape(Circle())
+// MARK: - Timeline Hour Section
+
+struct TimelineHourSection: View {
+    let hour: Int
+    let logs: [PhysiologyLog]
+    var isInvalidSleep: (PhysiologyLog) -> Bool = { _ in false }
+    var onTap: (PhysiologyLog) -> Void = { _ in }
+    var onDelete: (PhysiologyLog) -> Void = { _ in }
+
+    private func dotColor(for log: PhysiologyLog) -> Color {
+        if isInvalidSleep(log) {
+            return AppTheme.textSecondary.opacity(0.5)
+        }
+        if log.isWakeUpMarker {
+            return AppTheme.orange
+        }
+        return log.type?.themeColor ?? AppTheme.textSecondary
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            // Hour marker column
+            VStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    Text("\(hour)")
+                        .font(.caption2)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .frame(width: 20, alignment: .trailing)
+
+                    // Activity indicator dots
+                    HStack(spacing: 2) {
+                        ForEach(logs.prefix(3), id: \.id) { log in
+                            Circle()
+                                .fill(dotColor(for: log))
+                                .frame(width: 6, height: 6)
+                        }
                     }
+                    .frame(width: 24, alignment: .leading)
+                }
+            }
+            .frame(width: 52)
+            .padding(.top, 8)
 
-                    Button(action: {}) {
-                        Image(systemName: "timer")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(AppTheme.pink)
-                            .clipShape(Circle())
+            // Log entries for this hour
+            if logs.isEmpty {
+                // Empty hour - just show spacer
+                Spacer()
+                    .frame(height: 44)
+            } else {
+                VStack(spacing: 4) {
+                    ForEach(logs) { log in
+                        TimelineEntryRow(log: log, isInvalid: isInvalidSleep(log))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                onTap(log)
+                            }
+                            .contextMenu {
+                                Button {
+                                    onTap(log)
+                                } label: {
+                                    Label("编辑", systemImage: "pencil")
+                                }
+
+                                Button(role: .destructive) {
+                                    onDelete(log)
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
                     }
                 }
-                .padding(.trailing, 20)
-                .padding(.bottom, 180)
+                .padding(.vertical, 4)
             }
         }
+        .frame(minHeight: logs.isEmpty ? 44 : nil)
     }
 }
 
@@ -305,49 +372,87 @@ struct RecordView: View {
 
 struct TimelineEntryRow: View {
     let log: PhysiologyLog
+    var isInvalid: Bool = false
+
+    private var iconColor: Color {
+        if isInvalid {
+            return AppTheme.textSecondary
+        }
+        if log.isWakeUpMarker {
+            return AppTheme.orange
+        }
+        return log.type?.themeColor ?? AppTheme.textSecondary
+    }
 
     var body: some View {
         HStack(spacing: 12) {
+            // Time
             VStack(alignment: .trailing, spacing: 2) {
                 Text(log.startTime.formatted(date: .omitted, time: .shortened))
                     .font(.subheadline)
-                    .foregroundColor(AppTheme.textPrimary)
+                    .fontWeight(.medium)
+                    .foregroundColor(isInvalid ? AppTheme.textSecondary : AppTheme.textPrimary)
 
                 if let timeAgo = log.timeAgoString {
                     Text(timeAgo)
                         .font(.caption2)
-                        .foregroundColor(AppTheme.pink)
+                        .foregroundColor(isInvalid ? AppTheme.textSecondary : AppTheme.pink)
                 }
             }
-            .frame(width: 60, alignment: .trailing)
+            .frame(width: 65, alignment: .trailing)
 
+            // Icon with invalid indicator
             ZStack {
                 Circle()
-                    .fill(log.type?.themeColor.opacity(0.2) ?? AppTheme.cardBackground)
+                    .fill(iconColor.opacity(0.2))
                     .frame(width: 44, height: 44)
 
-                Image(systemName: log.type?.systemIcon ?? "note.text")
+                Image(systemName: log.displayIcon)
                     .font(.title3)
-                    .foregroundColor(log.type?.themeColor ?? AppTheme.textSecondary)
+                    .foregroundColor(iconColor)
+
+                // Invalid indicator
+                if isInvalid {
+                    Text("?")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 18, height: 18)
+                        .background(AppTheme.orange)
+                        .clipShape(Circle())
+                        .offset(x: 16, y: -16)
+                }
             }
 
+            // Content
             VStack(alignment: .leading, spacing: 2) {
-                Text(log.type?.chineseName ?? "记录")
-                    .font(.subheadline)
-                    .foregroundColor(AppTheme.textPrimary)
+                HStack(spacing: 4) {
+                    Text(log.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(isInvalid ? AppTheme.textSecondary : AppTheme.textPrimary)
+
+                    if isInvalid {
+                        Text("(无效)")
+                            .font(.caption2)
+                            .foregroundColor(AppTheme.orange)
+                    }
+                }
 
                 if let detail = log.detailString {
                     Text(detail)
                         .font(.caption)
-                        .foregroundColor(AppTheme.pink)
+                        .foregroundColor(isInvalid ? AppTheme.textSecondary : AppTheme.pink)
+                        .lineLimit(2)
                 }
             }
 
             Spacer()
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .padding(.horizontal, 12)
-        .background(AppTheme.cardBackground)
+        .background(isInvalid ? AppTheme.cardBackground.opacity(0.5) : AppTheme.cardBackground)
+        .cornerRadius(8)
     }
 }
 
@@ -412,6 +517,7 @@ extension PhysiologyLogType {
         case .sleep: return "moon.zzz.fill"
         case .diaperWet: return "drop.fill"
         case .diaperDirty: return "drop.fill"
+        case .bath: return "bathtub.fill"
         }
     }
 }
@@ -419,16 +525,45 @@ extension PhysiologyLogType {
 extension PhysiologyLog {
     var timeAgoString: String? {
         let minutes = Int(-startTime.timeIntervalSinceNow / 60)
+        if minutes < 0 { return nil } // Future time
         if minutes < 60 {
             return "\(minutes)分钟前"
         } else {
             let hours = minutes / 60
             let mins = minutes % 60
+            if mins == 0 {
+                return "\(hours)小时前"
+            }
             return "\(hours)小时\(mins)分钟前"
         }
     }
 
+    /// Check if this is a wake-up marker (sleep log where startTime == endTime)
+    var isWakeUpMarker: Bool {
+        guard type == .sleep, let endTime = endTime else { return false }
+        return abs(endTime.timeIntervalSince(startTime)) < 60 // Within 1 minute
+    }
+
+    var displayName: String {
+        if isWakeUpMarker {
+            return "起床"
+        }
+        return type?.chineseName ?? "记录"
+    }
+
+    var displayIcon: String {
+        if isWakeUpMarker {
+            return "sun.horizon.fill"
+        }
+        return type?.systemIcon ?? "note.text"
+    }
+
     var detailString: String? {
+        // Wake-up marker shows the notes (sleep duration info)
+        if isWakeUpMarker {
+            return notes
+        }
+
         switch type {
         case .milkFormula, .milkBreast:
             if let amount = amount {
@@ -441,12 +576,15 @@ extension PhysiologyLog {
                 let mins = duration % 60
                 return "\(hours)小时\(mins)分钟"
             }
+            return "睡眠中..."
         case .diaperDirty:
-            return "大/软/茶色"
+            return notes ?? "大/软/茶色"
         case .diaperWet:
             return "小便"
         case .milkSolid:
             return notes ?? "辅食"
+        case .bath:
+            return notes ?? "洗澡"
         case .none:
             return nil
         }
@@ -455,10 +593,5 @@ extension PhysiologyLog {
 }
 
 #Preview {
-    RecordView(baby: Baby(
-        id: "1",
-        familyId: "f1",
-        name: "宝宝",
-        birthDate: Calendar.current.date(byAdding: .year, value: -1, to: Date())!
-    ))
+    RecordView(baby: Baby.preview)
 }

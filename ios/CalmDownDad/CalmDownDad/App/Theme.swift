@@ -28,6 +28,9 @@ enum AppTheme {
     static let diaperColor = Color(hex: "FF8C42")
     static let solidFoodColor = Color(hex: "6BCB77")
     static let breastMilkColor = Color(hex: "FF69B4")
+    static let bathColor = Color(hex: "4D96FF")
+    static let vaccineColor = Color(hex: "9B59B6")
+    static let growthColor = Color(hex: "2ECC71")
 }
 
 // MARK: - Color Extension
@@ -74,23 +77,8 @@ extension PhysiologyLogType {
             return AppTheme.sleepColor
         case .diaperWet, .diaperDirty:
             return AppTheme.diaperColor
-        }
-    }
-
-    var cuteIcon: String {
-        switch self {
-        case .milkBreast:
-            return "🍼"
-        case .milkFormula:
-            return "🍼"
-        case .milkSolid:
-            return "🥣"
-        case .sleep:
-            return "😴"
-        case .diaperWet:
-            return "💧"
-        case .diaperDirty:
-            return "💩"
+        case .bath:
+            return AppTheme.bathColor
         }
     }
 
@@ -108,6 +96,8 @@ extension PhysiologyLogType {
             return "小便"
         case .diaperDirty:
             return "便便"
+        case .bath:
+            return "洗澡"
         }
     }
 }

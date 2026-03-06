@@ -25,6 +25,7 @@ enum PhysiologyLogType: String, Codable, CaseIterable {
     case sleep = "SLEEP"
     case diaperWet = "DIAPER_WET"
     case diaperDirty = "DIAPER_DIRTY"
+    case bath = "BATH"
 
     var displayName: String {
         switch self {
@@ -34,6 +35,7 @@ enum PhysiologyLogType: String, Codable, CaseIterable {
         case .sleep: return "Sleep"
         case .diaperWet: return "Wet Diaper"
         case .diaperDirty: return "Dirty Diaper"
+        case .bath: return "Bath"
         }
     }
 
@@ -45,6 +47,7 @@ enum PhysiologyLogType: String, Codable, CaseIterable {
         case .sleep: return "moon.zzz.fill"
         case .diaperWet: return "drop.triangle.fill"
         case .diaperDirty: return "leaf.fill"
+        case .bath: return "bathtub.fill"
         }
     }
 
@@ -56,6 +59,8 @@ enum PhysiologyLogType: String, Codable, CaseIterable {
             return .sleep
         case .diaperWet, .diaperDirty:
             return .diaper
+        case .bath:
+            return .other
         }
     }
 }
@@ -64,6 +69,7 @@ enum LogCategory: String, CaseIterable {
     case feeding = "Feeding"
     case sleep = "Sleep"
     case diaper = "Diaper"
+    case other = "Other"
 }
 
 // MARK: - Physiology Log Unit
@@ -212,4 +218,44 @@ enum SourceStatusCode: String, Codable {
     case degraded = "degraded"
     case fallback = "fallback"
     case skipped = "skipped"
+}
+
+// MARK: - Growth Measurement Type
+
+enum GrowthMeasurementType: String, Codable, CaseIterable {
+    case weight = "WEIGHT"
+    case height = "HEIGHT"
+    case headCircumference = "HEAD_CIRCUMFERENCE"
+
+    var displayName: String {
+        switch self {
+        case .weight: return "Weight"
+        case .height: return "Height"
+        case .headCircumference: return "Head Circumference"
+        }
+    }
+
+    var chineseName: String {
+        switch self {
+        case .weight: return "体重"
+        case .height: return "身高"
+        case .headCircumference: return "头围"
+        }
+    }
+
+    var unit: String {
+        switch self {
+        case .weight: return "kg"
+        case .height: return "cm"
+        case .headCircumference: return "cm"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .weight: return "scalemass.fill"
+        case .height: return "ruler.fill"
+        case .headCircumference: return "brain.head.profile"
+        }
+    }
 }
