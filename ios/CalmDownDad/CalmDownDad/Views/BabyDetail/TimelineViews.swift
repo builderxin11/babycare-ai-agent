@@ -83,6 +83,7 @@ struct LogRowView: View {
         case .feeding: return .orange
         case .sleep: return .indigo
         case .diaper: return .green
+        case .other: return .blue
         }
     }
 }

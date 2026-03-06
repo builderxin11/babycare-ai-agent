@@ -65,8 +65,9 @@ struct AskView: View {
 
     private var headerView: some View {
         VStack(spacing: 12) {
-            Text("✨")
+            Image(systemName: "sparkles")
                 .font(.system(size: 50))
+                .foregroundColor(AppTheme.pink)
 
             Text("智能育儿助手")
                 .font(.title2)
@@ -102,7 +103,8 @@ struct AskView: View {
                 }
             } label: {
                 HStack {
-                    Text("👶")
+                    Image(systemName: "face.smiling")
+                        .foregroundColor(AppTheme.pink)
 
                     if let baby = viewModel.selectedBaby {
                         Text(baby.name)
@@ -458,7 +460,7 @@ struct SourceBadgeDark: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(icon)
+            Image(systemName: iconName)
                 .font(.caption2)
 
             Text(displayName)
@@ -472,12 +474,12 @@ struct SourceBadgeDark: View {
         .cornerRadius(6)
     }
 
-    private var icon: String {
+    private var iconName: String {
         switch sourceType.lowercased() {
-        case "data_analysis", "data": return "📊"
-        case "medical", "book": return "📚"
-        case "xhs_post", "social": return "💬"
-        default: return "📄"
+        case "data_analysis", "data": return "chart.bar.fill"
+        case "medical", "book": return "book.fill"
+        case "xhs_post", "social": return "bubble.left.and.bubble.right.fill"
+        default: return "doc.fill"
         }
     }
 

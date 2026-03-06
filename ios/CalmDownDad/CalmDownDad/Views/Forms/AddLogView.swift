@@ -21,9 +21,7 @@ struct AddLogView: View {
         switch selectedType {
         case .milkBreast, .milkFormula, .milkSolid:
             return true
-        case .sleep:
-            return false
-        case .diaperWet, .diaperDirty:
+        case .sleep, .diaperWet, .diaperDirty, .bath:
             return false
         }
     }
@@ -38,7 +36,7 @@ struct AddLogView: View {
             return .ml
         case .sleep:
             return .minutes
-        case .diaperWet, .diaperDirty:
+        case .diaperWet, .diaperDirty, .bath:
             return .count
         }
     }
