@@ -3,8 +3,11 @@
 
 FROM dorowu/ubuntu-desktop-lxde-vnc:focal
 
-# Install dependencies for Chrome
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Fix Chrome GPG key from base image and install dependencies
+RUN rm -f /etc/apt/sources.list.d/google-chrome.list && \
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
@@ -24,32 +27,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     supervisor \
     curl \
+    google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Google Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg && \
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y google-chrome-stable && \
-    rm -rf /var/lib/apt/lists/*
 
 # Download xiaohongshu-mcp binary
 RUN mkdir -p /opt/xhs-mcp && \
-    curl -L "https://github.com/xpzouying/xiaohongshu-mcp/releases/latest/download/xiaohongshu-mcp-linux-amd64" -o /opt/xhs-mcp/xiaohongshu-mcp && \
-    chmod +x /opt/xhs-mcp/xiaohongshu-mcp
+    curl -L "https://github.com/xpzouying/xiaohongshu-mcp/releases/latest/download/xiaohongshu-mcp-linux-amd64.tar.gz" -o /tmp/xhs-mcp.tar.gz && \
+    tar -xzf /tmp/xhs-mcp.tar.gz -C /opt/xhs-mcp && \
+    mv /opt/xhs-mcp/xiaohongshu-mcp-linux-amd64 /opt/xhs-mcp/xiaohongshu-mcp && \
+    chmod +x /opt/xhs-mcp/xiaohongshu-mcp && \
+    rm /tmp/xhs-mcp.tar.gz
 
 # Create supervisor config for MCP
 RUN mkdir -p /etc/supervisor/conf.d
 COPY supervisord-xhs.conf /etc/supervisor/conf.d/xhs-mcp.conf
 
+# Create Chrome wrapper to intercept --user-data-dir and use persistent profile
+COPY chrome-with-profile.sh /usr/local/bin/chrome-with-profile
+RUN chmod +x /usr/local/bin/chrome-with-profile
+
 # Create startup script
-RUN echo '#!/bin/bash\n\
+RUN mkdir -p /opt/xhs-mcp/chrome-profile && \
+    echo '#!/bin/bash\n\
 # Wait for display to be ready\n\
 sleep 3\n\
 \n\
-# Start MCP server in non-headless mode\n\
+# Start MCP server with persistent Chrome profile\n\
 cd /opt/xhs-mcp\n\
-exec ./xiaohongshu-mcp -headless=false -port=3000\n\
+exec ./xiaohongshu-mcp -headless=false -port=:3000 -bin=/usr/local/bin/chrome-with-profile\n\
 ' > /opt/xhs-mcp/start.sh && chmod +x /opt/xhs-mcp/start.sh
 
 # Expose ports
