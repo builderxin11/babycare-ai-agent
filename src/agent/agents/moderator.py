@@ -150,7 +150,7 @@ def _call_critique_llm(state: AgentState) -> CritiqueResult:
     from langchain_core.messages import HumanMessage, SystemMessage
 
     llm = ChatBedrockConverse(
-        model=config.opus_model_id,
+        model=config.sonnet_model_id,
         region_name=config.aws_region,
         temperature=0,
     )

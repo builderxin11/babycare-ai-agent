@@ -249,28 +249,46 @@ def _fetch_xhs_notes(query: str, max_notes: int | None = None) -> tuple[list[dic
 
     sorted_notes = sorted(flat_notes, key=_engagement, reverse=True)[:max_notes]
 
-    detailed: list[dict[str, Any]] = []
-    failed_count = 0
-    for note in sorted_notes:
+    # Fetch details in parallel for lower latency
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _fetch_one(note: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+        """Fetch detail for a single note. Returns (note, failed)."""
         feed_id = note.get("feed_id")
         xsec_token = note.get("xsec_token", "")
         if not feed_id or not xsec_token:
-            detailed.append(note)
-            continue
+            return note, False
         try:
             detail = _mcp_call("get_feed_detail", {"feed_id": feed_id, "xsec_token": xsec_token})
             if isinstance(detail, dict):
-                # Extract content from nested structure: detail["data"]["note"]["desc"]
                 data = detail.get("data", {})
                 note_data = data.get("note", {})
                 content = note_data.get("desc", detail.get("content", detail.get("desc", "")))
                 note["content"] = content
-                detailed.append(note)
-            else:
-                detailed.append(note)
+            return note, False
         except Exception:
             logger.warning("Failed to fetch detail for feed %s, using summary.", feed_id)
-            detailed.append(note)
+            return note, True
+
+    detailed: list[dict[str, Any]] = []
+    failed_count = 0
+
+    with ThreadPoolExecutor(max_workers=min(len(sorted_notes), 5)) as executor:
+        future_to_idx = {
+            executor.submit(_fetch_one, note): i
+            for i, note in enumerate(sorted_notes)
+        }
+        # Collect results preserving original order
+        results: list[tuple[dict[str, Any], bool] | None] = [None] * len(sorted_notes)
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            results[idx] = future.result()
+
+    for result in results:
+        assert result is not None
+        note, failed = result
+        detailed.append(note)
+        if failed:
             failed_count += 1
 
     return detailed, failed_count

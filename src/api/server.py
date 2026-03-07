@@ -5,11 +5,13 @@ Run: uvicorn src.api.server:app --port 8000 --reload
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from agent.graph.builder import compile_graph
@@ -163,6 +165,105 @@ async def ask_agent(req: AskRequest) -> AskResponse:
         _graph.checkpointer.delete_thread(thread_id)
 
     return response
+
+
+@app.post("/ask/stream")
+async def ask_agent_stream(req: AskRequest) -> StreamingResponse:
+    """Invoke the multi-agent graph and stream progress via SSE.
+
+    Each agent completion emits an SSE event so the client sees progress
+    immediately instead of waiting for the full pipeline to finish.
+
+    Event types:
+      - agent: intermediate agent output (node_name + message)
+      - result: final ParentingAdvice JSON
+      - error: pipeline failure
+    """
+
+    def _generate():
+        thread_id = str(uuid.uuid4())
+        graph_config = {"configurable": {"thread_id": thread_id}}
+
+        initial_state = {
+            "question": req.question,
+            "baby_id": req.baby_id,
+            "baby_name": req.baby_name,
+            "baby_age_months": req.baby_age_months,
+            "messages": [],
+            "agents_completed": [],
+            "critique_count": 0,
+            "requires_human_review": False,
+            "human_review_reason": "",
+        }
+
+        try:
+            for event in _graph.stream(initial_state, graph_config, stream_mode="updates"):
+                for node_name, updates in event.items():
+                    messages = updates.get("messages", [])
+                    for msg in messages:
+                        content = msg.content if hasattr(msg, "content") else str(msg)
+                        data = json.dumps({"node": node_name, "message": content}, ensure_ascii=False)
+                        yield f"event: agent\ndata: {data}\n\n"
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'detail': str(e)})}\n\n"
+            return
+
+        # Handle HITL interrupt (auto-approve for MVP)
+        graph_state = _graph.get_state(graph_config)
+        if graph_state.tasks and any(
+            hasattr(t, "interrupts") and t.interrupts for t in graph_state.tasks
+        ):
+            from langgraph.types import Command
+
+            yield f"event: agent\ndata: {json.dumps({'node': 'hitl', 'message': '[hitl] Human review triggered, auto-approving...'})}\n\n"
+            try:
+                for event in _graph.stream(
+                    Command(resume="Approved via API (auto-approve)."),
+                    graph_config,
+                    stream_mode="updates",
+                ):
+                    for node_name, updates in event.items():
+                        messages = updates.get("messages", [])
+                        for msg in messages:
+                            content = msg.content if hasattr(msg, "content") else str(msg)
+                            data = json.dumps({"node": node_name, "message": content}, ensure_ascii=False)
+                            yield f"event: agent\ndata: {data}\n\n"
+            except Exception as e:
+                yield f"event: error\ndata: {json.dumps({'detail': str(e)})}\n\n"
+                return
+            graph_state = _graph.get_state(graph_config)
+
+        advice: ParentingAdvice | None = graph_state.values.get("final_advice")
+        if advice:
+            response = AskResponse(
+                question=advice.question,
+                summary=advice.summary,
+                key_points=advice.key_points,
+                action_items=advice.action_items,
+                risk_level=advice.risk_level.value,
+                confidence_score=advice.confidence_score,
+                citations=[c.model_dump() for c in advice.citations],
+                sources_used=[s.model_dump() for s in advice.sources_used],
+                is_degraded=advice.is_degraded,
+                raw_sources=advice.raw_sources,
+                disclaimer=advice.disclaimer,
+            )
+            yield f"event: result\ndata: {response.model_dump_json()}\n\n"
+        else:
+            yield f"event: error\ndata: {json.dumps({'detail': 'Agent produced no advice.'})}\n\n"
+
+        # Cleanup checkpoint
+        if hasattr(_graph.checkpointer, "delete_thread"):
+            _graph.checkpointer.delete_thread(thread_id)
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/report", response_model=ReportResponse)

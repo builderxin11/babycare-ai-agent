@@ -61,7 +61,7 @@ CalmDownDad does this with a swarm of four agents, a reflection loop, and a huma
 | **Data Scientist** | Pure Python | Statistical anomaly detection on feeding/sleep/diaper time-series. Expanding-window baseline, >25% deviation threshold, context event correlation. |
 | **Medical Expert** | Claude Sonnet (Bedrock) | Three-tier execution: stub → LLM-only → full KB RAG. Retrieves from AAP/CDC/WHO knowledge base with HYBRID search, interprets trend data in medical context. |
 | **Social Researcher** | Claude Sonnet (Bedrock) | Three-tier execution: stub → skip → Xiaohongshu MCP. JSON-RPC calls to XHS MCP server, engagement-weighted ranking, Chinese-language parenting community consensus. |
-| **Moderator** | Claude Opus (Bedrock) | Orchestrates agent dispatch, runs reflection loop (rule-based + LLM critique), three-source confidence scoring, contradiction detection, HITL interrupt, and normal/degraded synthesis. |
+| **Moderator** | Claude Sonnet (Bedrock) | Orchestrates agent dispatch, runs reflection loop (rule-based + LLM critique), three-source confidence scoring, contradiction detection, HITL interrupt, and normal/degraded synthesis. Critique downgraded from Opus to Sonnet for latency (see [Optimization Log](docs/optimization-log.md#optimization-2-critique-model-downgrade-opus--sonnet)). |
 
 ### Key Design Decisions
 
@@ -74,6 +74,64 @@ CalmDownDad does this with a swarm of four agents, a reflection loop, and a huma
 **Human-in-the-Loop** — When confidence falls below 0.8 or the medical risk is HIGH, the graph pauses via `interrupt()`. The state is checkpointed; a human reviewer can inspect, modify, and resume asynchronously. The eval framework auto-approves interrupts via `Command(resume=...)` for CI.
 
 **Degraded Synthesis** — When confidence is critically low (<0.4) or the medical agent produced no insight, the system switches to degraded mode: raw source snippets are presented directly with a disclaimer, instead of a poorly synthesized answer that might mislead.
+
+## Performance Optimization Journey
+
+Latency is critical for a parenting app — a worried parent won't wait 60 seconds for an answer. This section documents the step-by-step optimizations that brought end-to-end response time from ~60s down to ~15-20s, with perceived latency near-instant via streaming.
+
+> Full details, measurements, and implementation notes: [docs/optimization-log.md](docs/optimization-log.md)
+
+### Step 1: Agent Parallelization (Medical Expert || Social Researcher)
+
+**Problem:** The original supervisor loop ran all three specialist agents sequentially (`data_scientist → medical_expert → social_researcher`), even though Medical Expert and Social Researcher are independent — both only need Data Scientist output.
+
+**Solution:** Replaced sequential dispatch with LangGraph's `Send()` fan-out pattern. After Data Scientist completes, Medical Expert and Social Researcher execute in parallel. A join node synchronizes them before critique.
+
+```
+BEFORE:  data_scientist → medical_expert → social_researcher → critique
+AFTER:   data_scientist → [medical_expert ‖ social_researcher] → critique
+```
+
+**Impact:** ~40% latency reduction on the parallel segment (5-15s saved).
+
+### Step 2: Critique Model Downgrade (Opus → Sonnet)
+
+**Problem:** The critique node used Claude Opus for quality review — the single largest latency bottleneck. Opus is 3-5x slower than Sonnet, but the critique task (approve/reject + confidence scoring) doesn't require Opus-level reasoning.
+
+**Solution:** Switched `_call_critique_llm()` to use Sonnet. The rule-based fallback still provides a quality floor if the LLM critique fails. Opus remains the eval judge for regression detection.
+
+**Impact:** 8-15s saved per critique iteration.
+
+### Step 3: Parallel XHS Note Detail Fetching
+
+**Problem:** After searching Xiaohongshu, the Social Researcher fetched full content for each post **sequentially** (5 posts × 2-5s each = 10-25s).
+
+**Solution:** Replaced the sequential loop with `concurrent.futures.ThreadPoolExecutor`. All 5 detail fetches now run in parallel. Per-note error isolation is preserved.
+
+**Impact:** 8-20s saved (from `N × avg_time` to `max(times)`).
+
+### Step 4: SSE Streaming Endpoint
+
+**Problem:** The `/ask` endpoint waited for the entire pipeline before returning. Users saw nothing for 15-35 seconds.
+
+**Solution:** Added `POST /ask/stream` returning Server-Sent Events. Each agent node emits an event on completion, so users see real-time progress within 1-2 seconds.
+
+| SSE Event | Payload | When |
+|-----------|---------|------|
+| `agent` | `{"node": "medical_expert", "message": "..."}` | Each agent completes |
+| `result` | Full `AskResponse` JSON | Pipeline finishes |
+| `error` | `{"detail": "..."}` | Pipeline failure |
+
+**Impact:** Perceived latency drops from 15-35s to ~1s (first visible feedback).
+
+### Cumulative Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| End-to-end latency | ~35-70s | ~15-25s |
+| Time to first feedback | 35-70s | ~1-2s (streaming) |
+| Critique node | 10-20s (Opus) | 3-8s (Sonnet) |
+| XHS detail fetch | 10-25s (serial) | 2-5s (parallel) |
 
 ## Eval Framework
 
@@ -247,6 +305,7 @@ PYTHONPATH=src uvicorn api.server:app --port 8000 --reload
 
 The API exposes:
 - `POST /ask` — Send a parenting question, receive `ParentingAdvice` JSON
+- `POST /ask/stream` — Same as `/ask` but returns Server-Sent Events for real-time progress
 - `POST /report` — Generate a daily health report for a baby (no question needed)
 - `GET /health` — Health check
 

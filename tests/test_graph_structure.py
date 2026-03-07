@@ -6,10 +6,10 @@ from agent.graph.builder import build_graph, compile_graph
 
 
 EXPECTED_NODES = {
-    "supervisor",
     "data_scientist",
     "medical_expert",
     "social_researcher",
+    "join",
     "critique",
     "hitl_check",
     "synthesize",

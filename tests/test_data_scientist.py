@@ -59,7 +59,10 @@ class TestDataScientistFallback:
 
     def test_no_tables_returns_fallback_status(self):
         """Without table names configured, should produce FALLBACK status."""
-        result = data_scientist_node(_make_state())
+        with patch("agent.agents.data_scientist.config") as mock_config:
+            mock_config.physiology_log_table = None
+            mock_config.context_event_table = None
+            result = data_scientist_node(_make_state())
         status = result["source_statuses"][0]
         assert status.status == SourceStatusCode.FALLBACK
         assert "No DynamoDB tables configured" in status.message

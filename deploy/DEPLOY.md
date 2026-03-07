@@ -1,6 +1,121 @@
-# CalmDownDad EC2 Deployment Guide
+# CalmDownDad Deployment Guide
 
-## Architecture
+This guide covers two deployment options:
+1. **ECS Fargate** (Recommended for production) - Managed, scalable, no servers to manage
+2. **EC2 Docker** - For development or when you need VNC access for XHS MCP login
+
+---
+
+## Option 1: ECS Fargate (Recommended)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ECS Fargate                            │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │   FastAPI Agent Service (Auto-scaling)              │   │
+│  │   - Data Scientist, Medical Expert, Social Researcher│   │
+│  └───────────────────────────┬─────────────────────────┘   │
+│                              │                              │
+│  ┌───────────────────────────▼─────────────────────────┐   │
+│  │   Application Load Balancer                         │   │
+│  └─────────────────────────────────────────────────────┘   │
+└──────────────────────────────┼─────────────────────────────┘
+                               │ (Optional)
+┌──────────────────────────────▼─────────────────────────────┐
+│                    EC2 t3.micro (Optional)                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │   XHS MCP Server + VNC (for Xiaohongshu login)     │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Prerequisites
+
+- AWS CLI configured (`aws configure`)
+- Docker installed
+- VPC with at least 2 subnets in different AZs
+
+### Quick Deploy
+
+```bash
+cd deploy/fargate
+
+# 1. Copy and configure environment
+cp .env.example .env
+nano .env  # Fill in VPC_ID, SUBNET_IDS, table names, etc.
+
+# 2. Deploy everything (build, push to ECR, deploy CloudFormation)
+chmod +x deploy.sh
+./deploy.sh all
+```
+
+### Step-by-Step Deploy
+
+```bash
+# Build Docker image
+./deploy.sh build
+
+# Push to ECR
+./deploy.sh push
+
+# Deploy CloudFormation stack
+./deploy.sh deploy
+```
+
+### Management Commands
+
+```bash
+# Check service status
+./deploy.sh status
+
+# View logs
+./deploy.sh logs
+
+# Force new deployment (after code changes)
+./deploy.sh update
+
+# Delete everything
+./deploy.sh destroy
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| VPC_ID | Yes | VPC to deploy into |
+| SUBNET_IDS | Yes | At least 2 subnets (comma-separated) |
+| BABY_TABLE | Yes | DynamoDB table from Amplify |
+| PHYSIOLOGY_LOG_TABLE | Yes | DynamoDB table from Amplify |
+| CONTEXT_EVENT_TABLE | Yes | DynamoDB table from Amplify |
+| COGNITO_USER_POOL_ID | Yes | Cognito pool from Amplify |
+| BEDROCK_KB_ID | No | Bedrock Knowledge Base ID |
+| XHS_MCP_URL | No | XHS MCP server URL (if using) |
+
+### Adding XHS MCP Support (Optional)
+
+If you need Xiaohongshu social consensus, deploy the XHS MCP on a small EC2 instance:
+
+1. Launch EC2 t3.micro in the same VPC
+2. Follow [EC2 XHS MCP Setup](#step-5-login-to-xiaohongshu) below
+3. Set `XHS_MCP_URL=http://<EC2_PRIVATE_IP>:3000` in Fargate config
+
+### Cost Estimate
+
+| Resource | Estimated Cost |
+|----------|---------------|
+| Fargate (0.5 vCPU, 1GB) | ~$15/month |
+| ALB | ~$20/month |
+| ECR | ~$1/month |
+| XHS MCP EC2 (optional) | ~$8/month |
+| **Total** | **~$35-45/month** |
+
+---
+
+## Option 2: EC2 Docker (All-in-One)
+
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
